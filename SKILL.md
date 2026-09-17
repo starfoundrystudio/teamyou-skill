@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, todos, projects, areas, and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, or to write, read, or share a document on the agent drive.
 metadata:
-  version: '3.2.0'
+  version: '3.2.1'
   min_codex_version: '1.0.0'
 ---
 

@@ -21,9 +21,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.2.0"
+SKILL_VERSION="3.2.1"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_ZtBa8XOxXWcH"
+SKILL_VERSION_GUID="vg_zdh0Z1zwyRpM"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {

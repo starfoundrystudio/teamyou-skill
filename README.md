@@ -1,110 +1,134 @@
-# TeamYou Clawdbot Skill
+# TeamYou Skill
 
 
-A Clawdbot skill for interacting with the [TeamYou](https://teamyou.ai) API to manage knowledge topics, details, todos, and semantic search.
+An agent skill for the [TeamYou](https://teamyou.ai) API: knowledge topics, details and
+edges, semantic search, todos, projects and areas, and TY Agent Drive (document and file
+storage for agents, markdown today).
 
 
-## Installation
+TeamYou is the shared workspace an AI + human team reviews on the web and on a phone. The
+agent writes knowledge, work and documents into it through this skill; the human reads,
+steers and marks steps there. Every command is
+`"$TY_DIR/scripts/teamyou.sh" ty <noun> <action> [args]`, output is JSON on stdout, and
+`-h` at any level prints help.
 
-Install from the artifact link TeamYou gives you — the same version-pinned archive
-`GET /api/skill/install` returns (the controlled Vercel Blob zip, also surfaced to the
-gate and update notices as `install_url`). Download and unzip it, then set your API key
-(see Setup below):
+## Install
+
+Three ways in. They deliver the same payload; pick the one your harness prefers.
+
+**1. From this repository (the `skills` CLI).**
 
 ```bash
-curl -L -o teamyou-skill.zip "<artifact-url-from-your-TeamYou-install-page>"
-unzip teamyou-skill.zip
+npx skills add starfoundrystudio/teamyou-skill
+```
+
+`SKILL.md` sits at the repository root, so the CLI discovers it without extra flags. Add
+`-a <agent>` to target a specific harness and `--copy` to vendor the files into the
+project instead of linking them.
+
+**2. From the version-pinned archive TeamYou hands out.**
+
+Your TeamYou account publishes a controlled, version-pinned zip — the same artifact
+`GET /api/skill/install` returns, and the same URL that gate responses and update notices
+carry as `install_url`. This is the install channel TeamYou points at, and the one an
+update notice means when it tells an agent to reinstall.
+
+```bash
+curl -L -o teamyou-skill.zip "<the install URL from your TeamYou account>"
+```
+
+Unzip it wherever your harness keeps skills (see below). The archive unpacks to a
+`teamyou-skill/` directory with `SKILL.md` at its root.
+
+**3. As a plain skill directory.**
+
+Harnesses that follow the open Agent Skills format load a skill from a directory whose
+root holds `SKILL.md`. Clone this repository, or unzip the archive, so that the folder you
+drop in contains `SKILL.md`, `references/` and `scripts/` at its top level. Nothing needs
+to be built. Codex, for example, scans `.agents/skills` from the working directory up to
+the repository root and `$HOME/.agents/skills` for personal skills, so a
+`$HOME/.agents/skills/teamyou/` directory is enough:
+
+```bash
+mkdir -p ~/.agents/skills
+git clone https://github.com/starfoundrystudio/teamyou-skill.git ~/.agents/skills/teamyou
 ```
 
 ## Setup
 
-Get your API key from [TeamYou Settings](https://teamyou.com/settings), then configure:
+Get an API key from your [TeamYou settings](https://teamyou.ai/settings), then either:
 
 ```bash
-# Option 1: Environment variable
+# Option 1: environment variable
 export TEAMYOU_API_KEY="ty_your_api_key_here"
 
-# Option 2: Config file (recommended)
+# Option 2: key file (recommended for long-lived agents)
 echo "ty_your_api_key_here" > ~/.teamyou_key
 ```
 
 ## Usage
 
-Once installed, you can interact with TeamYou through OpenClaw:
+The skill's files live in the directory that holds `SKILL.md`. Resolve the helper against
+that directory once, and reuse it — the agent's working directory is usually somewhere
+else:
+
+```bash
+SKILL_MD="<the SKILL.md location your runtime gave you>"
+SKILL_MD="${SKILL_MD/#\~/$HOME}"
+TY_DIR="$(cd "$(dirname "$SKILL_MD")" && pwd)"
+
+"$TY_DIR/scripts/teamyou.sh" ty graph topics-list
+"$TY_DIR/scripts/teamyou.sh" ty graph search-topics "italian cooking" medium
+"$TY_DIR/scripts/teamyou.sh" ty todos list --status todo
+"$TY_DIR/scripts/teamyou.sh" ty agent-drive list
+```
+
+In conversation that looks like:
 
 ```
 "Search my TeamYou topics for anything about Italian cooking"
 "Create a new TeamYou topic called 'Project Ideas' about AI applications"
 "Add these details to topic abc123: Use RAG for context, Focus on mobile UX"
-"Update TeamYou topic abc123 summary to focus on launch milestones"
-"Delete detail def456 from topic abc123"
 "Show me my high priority todos"
-"Create a todo to review the PR, high priority, due tomorrow"
+"Write today's meeting notes to my agent drive and share them with the team"
 ```
 
-When creating or renaming topics, keep the name to 1-3 words (for example: `Sprint Planning`, `Dr Martinez`, `Spanish`) and file it into an existing area with `teamyou.sh ty areas refs-add`.
-When linking topics, use the dedicated edges API: `teamyou.sh ty graph edges-create SOURCE_TOPIC_ID TARGET_TOPIC_ID "label" --mirror-label "inverse label"`. A single edge row covers both directions of the relationship.
-When adding details, run a quick `search-topics` on keywords from the new detail and create edges only for actionable relationships.
-When richer context is needed, `topics-get` returns inlined `edges` — follow relevant `linkedTopicId`s (usually one hop) for context.
-When details contain durable named entities (especially people), create/reuse entity topics and link them once with `edges-create`.
+## What it covers
 
-## Features
+- **Topics** — create, read, update, delete knowledge containers, optionally with edges
+- **Details** — atomic facts with automatic embedding generation
+- **Edges** — graph relationships between topics, one row covering both directions
+- **Search** — semantic search across topics and details
+- **Todos, projects, areas** — the work surface the human reviews
+- **TY Agent Drive** — document and file storage for agents (markdown today), with
+  per-document sharing
 
-- **Topics**: Create, read, update, delete knowledge containers (optionally with initial edges)
-- **Details**: Create, read, update, delete atomic facts with automatic embedding generation
-- **Edges**: Create, read, update, delete graph relationships between topics
-- **Search**: Semantic search across all topics and details
-- **Todos**: Task management with priorities, due dates, and archiving
-
+Full command reference: [SKILL.md](SKILL.md) for the body and conventions,
+[references/](references/) for per-noun command pages and the generated per-domain API
+reference under `references/api/`.
 
 ## Requirements
 
-- `jq` - JSON processor (typically included with OpenClaw setup)
-- TeamYou API key
+- `bash`, `curl` and `jq`
+- A TeamYou API key
 
-## Development
+## Versioning and provenance
 
-### Testing the Script
+This repository is a publish target, not the source of truth: every public release is the
+validated artifact, extracted and committed. Releases are tagged `vX.Y.Z`, matching
+`metadata.version` in [SKILL.md](SKILL.md).
 
-```bash
-# Set your API key
-export TEAMYOU_API_KEY="ty_your_key"
+`skill-release.json` at the root records what a tag contains:
 
-# Test commands (resolve TY_DIR once, per SKILL.md "Using the helper")
-"$TY_DIR/scripts/teamyou.sh" ty graph topics-list
-"$TY_DIR/scripts/teamyou.sh" ty graph search-topics "test query" medium
-"$TY_DIR/scripts/teamyou.sh" ty todos list --status todo
-```
+| Field | Meaning |
+| --- | --- |
+| `version` | the released SemVer, same as the tag |
+| `git_commit` | the source commit in the TeamYou monorepo the payload was built from |
+| `sha256` | the checksum of the published archive these files came out of |
 
-### Packaging
+Because the tag carries the same bytes as the published archive, `sha256` is how you check
+that an archive you downloaded is the release it claims to be.
 
-```bash
-# Package the skill for release from repo root
-./scripts/package-teamyou-skill.sh public 3.2.0
-```
+## License
 
-### Creating a release
-
-Use GitHub Actions workflow `Release TeamYou Skill` with inputs `variant` and `version`:
-
-- Validates SemVer input and `metadata.version` alignment
-- Packages immutable artifact(s) under `dist/`
-- Creates tag `skill/teamyou-public/vX.Y.Z`
-- Publishes a GitHub Release with `teamyou-skill-public-vX.Y.Z.zip` and `SHA256SUMS`
-
-### Publish a direct install ZIP via Vercel Blob
-
-If you want a link-share install path, upload the artifact to your public Blob store:
-
-```bash
-# repo root
-export BLOB_READ_WRITE_TOKEN="vercel_blob_rw_..."
-./scripts/publish-teamyou-skill.sh public 3.2.0 teamyou-skill
-```
-
-The script prints a public download URL that can be shared directly with OpenClaw users.
-
-## Documentation
-
-- [SKILL.md](SKILL.md) - the skill body: conventions, nouns, notices
-- [references/](references/) - command references per noun, conventions, update handling, and the generated per-domain API reference under `references/api/`
+[MIT](LICENSE) — Copyright (c) 2026 Star Foundry Studio.
