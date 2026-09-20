@@ -21,9 +21,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.2.1"
+SKILL_VERSION="3.3.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_zdh0Z1zwyRpM"
+SKILL_VERSION_GUID="vg_NAl7IHWM2TQX"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {
@@ -594,10 +594,10 @@ dispatch_ty_graph() {
 }
 
 # ============================================================================
-# ty todos — Todo management
+# ty tasks — Task management
 # ============================================================================
 
-todos_list() {
+tasks_list() {
   local params=""
 
   while [[ $# -gt 0 ]]; do
@@ -616,10 +616,10 @@ todos_list() {
     params="?$params"
   fi
 
-  api_request GET "/todos$params"
+  api_request GET "/tasks$params"
 }
 
-todos_create() {
+tasks_create() {
   local title=$1
   shift || true
   require_value "title" "$title"
@@ -678,19 +678,19 @@ todos_create() {
         | if $before != "" then . + {before: $before} else . end
       )} else . end')
 
-  api_request POST /todos "$data"
+  api_request POST /tasks "$data"
 }
 
-todos_get() {
-  local todo_id=$1
-  require_value "todo_id" "$todo_id"
-  api_request GET "/todos/$todo_id"
+tasks_get() {
+  local task_id=$1
+  require_value "task_id" "$task_id"
+  api_request GET "/tasks/$task_id"
 }
 
-todos_update() {
-  local todo_id=$1
+tasks_update() {
+  local task_id=$1
   shift || true
-  require_value "todo_id" "$todo_id"
+  require_value "task_id" "$task_id"
 
   local title="" description="" status="" priority="" due_date="" archived="" topic_id="" clear_topic=""
   local project_id="" clear_project="" after="" before=""
@@ -760,35 +760,35 @@ todos_update() {
         | if $before != "" then . + {before: $before} else . end
       )} else . end')
 
-  api_request PUT "/todos/$todo_id" "$data"
+  api_request PUT "/tasks/$task_id" "$data"
 }
 
-todos_delete() {
-  local todo_id=$1
-  require_value "todo_id" "$todo_id"
-  api_request DELETE "/todos/$todo_id"
+tasks_delete() {
+  local task_id=$1
+  require_value "task_id" "$task_id"
+  api_request DELETE "/tasks/$task_id"
 }
 
-todos_complete() {
-  local todo_id=$1
-  require_value "todo_id" "$todo_id"
-  api_request POST "/todos/$todo_id/complete"
+tasks_complete() {
+  local task_id=$1
+  require_value "task_id" "$task_id"
+  api_request POST "/tasks/$task_id/complete"
 }
 
-dispatch_ty_todos() {
-  ty_dispatch_begin "ty todos" show_ty_todos_help "$@" && return 0
+dispatch_ty_tasks() {
+  ty_dispatch_begin "ty tasks" show_ty_tasks_help "$@" && return 0
   local action=$1
   shift
 
   case "$action" in
-    list) todos_list "$@" ;;
-    create) todos_create "$@" ;;
-    get) todos_get "$@" ;;
-    update) todos_update "$@" ;;
-    delete) todos_delete "$@" ;;
-    complete) todos_complete "$@" ;;
-    -h|--help) show_ty_todos_help ;;
-    *) echo "Unknown ty todos action: $action" >&2; echo "Run 'teamyou.sh ty todos -h' for usage" >&2; exit 1 ;;
+    list) tasks_list "$@" ;;
+    create) tasks_create "$@" ;;
+    get) tasks_get "$@" ;;
+    update) tasks_update "$@" ;;
+    delete) tasks_delete "$@" ;;
+    complete) tasks_complete "$@" ;;
+    -h|--help) show_ty_tasks_help ;;
+    *) echo "Unknown ty tasks action: $action" >&2; echo "Run 'teamyou.sh ty tasks -h' for usage" >&2; exit 1 ;;
   esac
 }
 
@@ -1857,7 +1857,7 @@ dispatch_ty() {
 
   case "$service" in
     graph) dispatch_ty_graph "$@" ;;
-    todos) dispatch_ty_todos "$@" ;;
+    tasks) dispatch_ty_tasks "$@" ;;
     projects) dispatch_ty_projects "$@" ;;
     areas) dispatch_ty_areas "$@" ;;
     agent) dispatch_ty_agent "$@" ;;
@@ -1871,6 +1871,14 @@ dispatch_ty() {
     drive)
       echo "[TeamYou] 'ty drive' is deprecated; use 'ty agent-drive' instead." >&2
       dispatch_ty_agent_drive "$@"
+      ;;
+    # The retired tasks noun (TYDEV-1214), same treatment as `drive` above: it
+    # answers for agents already in the field, is listed in no help table, warns
+    # on STDERR only, and dispatches to the same function - so a script piping
+    # the old noun into jq sees byte-identical stdout while learning the live name.
+    todos)
+      echo "[TeamYou] 'ty todos' is deprecated; use 'ty tasks' instead." >&2
+      dispatch_ty_tasks "$@"
       ;;
     -h|--help) show_ty_help ;;
     *) echo "Unknown ty service: $service" >&2; echo "Run 'teamyou.sh ty -h' for usage" >&2; exit 1 ;;
@@ -1888,7 +1896,7 @@ TeamYou API helper
 Usage: teamyou.sh <provider> <service> <action> [arguments]
 
 Providers:
-  ty        TeamYou native services (graph, todos)
+  ty        TeamYou native services (graph, tasks)
 EOF
 
   cat <<'EOF'
@@ -1903,7 +1911,7 @@ Examples:
   teamyou.sh ty graph topics-list
   teamyou.sh ty graph topics-create "Learning: Italian Cooking" "Recipes and techniques from Italy"
   teamyou.sh ty graph edges-create SOURCE_ID TARGET_ID "enables" --mirror-label "enabled by"
-  teamyou.sh ty todos list --status todo --priority high
+  teamyou.sh ty tasks list --status todo --priority high
 EOF
 
 }
@@ -1916,7 +1924,7 @@ Usage: teamyou.sh ty <service> <action> [arguments]
 
 Services:
   graph          Topics, details, edges, and semantic search
-  todos          Task management
+  tasks          Task management
   projects       Projects, plans, and references
   areas          Cross-pillar contexts (membership + rollup)
   agent          Agent registration and identity
@@ -1965,23 +1973,23 @@ EOF
 }
 # GENERATED-FROM-OPENAPI:graph:end
 
-# GENERATED-FROM-OPENAPI:todos:start
-show_ty_todos_help() {
+# GENERATED-FROM-OPENAPI:tasks:start
+show_ty_tasks_help() {
   cat <<'EOF'
-TeamYou Todos (ty todos)
+TeamYou Tasks (ty tasks)
 
-Usage: teamyou.sh ty todos <action> [arguments]
+Usage: teamyou.sh ty tasks <action> [arguments]
 
 Actions:
   list [--status todo|done] [--archived] [--priority high|medium|low|none] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
-  create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <todo_id>] [--before <todo_id>]
-  get <todo_id>
-  update <todo_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <todo_id>] [--before <todo_id>]
-  delete <todo_id>
-  complete <todo_id>
+  create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>]
+  get <task_id>
+  update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>]
+  delete <task_id>
+  complete <task_id>
 EOF
 }
-# GENERATED-FROM-OPENAPI:todos:end
+# GENERATED-FROM-OPENAPI:tasks:end
 
 # GENERATED-FROM-OPENAPI:projects:start
 show_ty_projects_help() {

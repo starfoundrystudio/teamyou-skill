@@ -23,7 +23,7 @@ is refused with a pointer to that help rather than stored as text.
 - [Workflow: enriching context by following edges](#workflow-enriching-context-by-following-edges)
 - [Workflow: finding information](#workflow-finding-information)
 - [Workflow: a project from a paragraph](#workflow-a-project-from-a-paragraph)
-- [Workflow: managing todos](#workflow-managing-todos)
+- [Workflow: managing tasks](#workflow-managing-tasks)
 
 ## Topic naming (the Goldilocks rule)
 
@@ -43,7 +43,7 @@ When creating or renaming topics (`ty graph topics-create`, `ty graph topics-upd
 
 ## Filing: areas are containers
 
-An area groups topics, todos, projects, documents and links that belong to one part of
+An area groups topics, tasks, projects, documents and links that belong to one part of
 life or work, and can nest inside another area. Filing a topic means adding it to an area
 with `ty areas refs-add`, not spelling the area into the name.
 
@@ -245,19 +245,19 @@ PROJECT_ID=$("$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin permit" \
 "$TY_DIR/scripts/teamyou.sh" ty projects get "$PROJECT_ID" | jq '.project.nextAction'
 ```
 
-## Workflow: managing todos
+## Workflow: managing tasks
 
 ```bash
-# Today's high-priority todos
-"$TY_DIR/scripts/teamyou.sh" ty todos list --status todo --priority high --order-by dueDate
+# Today's high-priority tasks
+"$TY_DIR/scripts/teamyou.sh" ty tasks list --status todo --priority high --order-by dueDate
 
 # Create with a due date
-"$TY_DIR/scripts/teamyou.sh" ty todos create "Review PR" \
+"$TY_DIR/scripts/teamyou.sh" ty tasks create "Review PR" \
   --description "Check TeamYou API skill PR" \
   --priority high \
   --due-date "2026-01-31T17:00:00Z"
 
 # Complete, then archive
-"$TY_DIR/scripts/teamyou.sh" ty todos complete TODO_ID
-"$TY_DIR/scripts/teamyou.sh" ty todos update TODO_ID --archived
+"$TY_DIR/scripts/teamyou.sh" ty tasks complete TASK_ID
+"$TY_DIR/scripts/teamyou.sh" ty tasks update TASK_ID --archived
 ```

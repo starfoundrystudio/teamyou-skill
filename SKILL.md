@@ -1,15 +1,15 @@
 ---
 name: teamyou
-description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, todos, projects, areas, and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, or to write, read, or share a document on the agent drive.
+description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, or to write, read, or share a document on the agent drive.
 metadata:
-  version: '3.2.1'
+  version: '3.3.0'
   min_codex_version: '1.0.0'
 ---
 
 # TeamYou API Skill
 
 TeamYou is the shared workspace an AI + human team reviews on the web and phone. Through
-this skill you write knowledge (topics, details, edges), work (todos, projects, areas) and
+this skill you write knowledge (topics, details, edges), work (tasks, projects, areas) and
 documents (TY Agent Drive) into it; the human reads, steers and marks steps there. Every
 command is `"$TY_DIR/scripts/teamyou.sh" ty <noun> <action> [args]`, output is JSON on
 stdout, and `-h` at any level prints help — after an action too (`ty projects create -h`),
@@ -109,7 +109,7 @@ Long form, the entity mapping and worked workflows:
 | Noun          | Most common                                         | Reference                                                     |
 | ------------- | --------------------------------------------------- | ------------------------------------------------------------- |
 | `graph`       | `topics-create`, `details-add`, `search-topics`     | [commands-graph.md](references/commands-graph.md)             |
-| `todos`       | `create`, `list --status todo`                      | [commands-todos.md](references/commands-todos.md)             |
+| `tasks`       | `create`, `list --status todo`                      | [commands-tasks.md](references/commands-tasks.md)             |
 | `projects`    | `create` (one call: plan + refs), `get`, `doc-push` | [commands-projects.md](references/commands-projects.md)       |
 | `areas`       | `refs-add` (file a topic), `get --depth full`       | [commands-areas.md](references/commands-areas.md)             |
 | `agent-drive` | `push`, `search`                                    | [commands-agent-drive.md](references/commands-agent-drive.md) |
@@ -117,6 +117,7 @@ Long form, the entity mapping and worked workflows:
 
 
 Old pattern: the Agent Drive noun changed from `ty drive` to `ty agent-drive`; the old spelling still runs and says so on stderr, so use `ty agent-drive` everywhere.
+Old pattern: the tasks noun changed from `ty todos` to `ty tasks`; the old spelling still runs and says so on stderr, so use `ty tasks` everywhere.
 
 ```bash
 # Knowledge: search, then create a plain-named topic and add atomic details
@@ -127,8 +128,8 @@ TOPIC_ID=$("$TY_DIR/scripts/teamyou.sh" ty graph topics-create "Italian Cooking"
 # File the topic into an existing area (membership, not a name prefix)
 "$TY_DIR/scripts/teamyou.sh" ty areas refs-add AREA_ID --target-type topic --target-id "$TOPIC_ID"
 
-# Work: a todo, and a project with its ordered plan and references in ONE call
-"$TY_DIR/scripts/teamyou.sh" ty todos create "Buy groceries" --priority high --due-date "2026-02-01T00:00:00Z"
+# Work: a task, and a project with its ordered plan and references in ONE call
+"$TY_DIR/scripts/teamyou.sh" ty tasks create "Buy groceries" --priority high --due-date "2026-02-01T00:00:00Z"
 "$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin expansion" --goal "Permits filed" \
   --todo "Call the county about setbacks" --todo "Get three framing quotes" \
   --ref url:https://example.com/permit-checklist
@@ -164,7 +165,7 @@ The same operations are also served over the Model Context Protocol at
 `https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers:
 authenticate with the same `Authorization: Bearer ty_<key>` you use here (OAuth comes
 later). Each tool is named for one service at one permission level - `graph_read` /
-`graph_write`, `todos_read` / `todos_write`, `agent_drive_read` / `agent_drive_write` /
+`graph_write`, `tasks_read` / `tasks_write`, `agent_drive_read` / `agent_drive_write` /
 `agent_drive_sharing` - and takes a required `action` argument whose values are the same
 verbs this helper uses. A small default set is advertised; `?tools=extended` on the server
 URL puts the full API behind it, adding the remaining services and replacing the tools
@@ -181,9 +182,10 @@ The HTTP contract, one file per domain (each self-contained; a Contents block on
 100 lines):
 [overview](references/api/overview.md) · [topics](references/api/topics.md) ·
 [details](references/api/details.md) · [edges](references/api/edges.md) ·
-[search](references/api/search.md) · [todos](references/api/todos.md) ·
+[search](references/api/search.md) · [tasks](references/api/tasks.md) ·
 [projects](references/api/projects.md) · [areas](references/api/areas.md) ·
 [agents](references/api/agents.md) · [agent-drive](references/api/agent-drive.md) ·
 [preferences](references/api/preferences.md) ·
-[agent-drive (deprecated paths)](references/api/agent-drive-deprecated.md).
+[agent-drive (deprecated paths)](references/api/agent-drive-deprecated.md) ·
+[tasks (deprecated paths)](references/api/tasks-deprecated.md).
 

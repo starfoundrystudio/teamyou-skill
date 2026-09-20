@@ -69,7 +69,7 @@ Public machine-readable contract. No authentication required.
 The same operations are served over the Model Context Protocol at
 `https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers, and the same
 `Authorization: Bearer ty_<key>` as above (OAuth comes later). Each tool is named for one
-service at one permission level (`graph_read` / `graph_write`, `todos_read` / `todos_write`,
+service at one permission level (`graph_read` / `graph_write`, `tasks_read` / `tasks_write`,
 `agent_drive_read` / `agent_drive_write` / `agent_drive_sharing`, …) and takes a required
 `action` argument naming the operation to run. 7 tools are advertised by
 default; `?tools=extended` widens that to 18 — it adds the remaining
@@ -88,10 +88,11 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `details.md` | Details | 4 |
 | `edges.md` | Edges | 4 |
 | `search.md` | Search | 2 |
-| `todos.md` | Todos | 6 |
+| `tasks.md` | Tasks | 6 |
 | `projects.md` | Projects | 9 |
 | `areas.md` | Areas | 8 |
 | `agents.md` | Agents | 3 |
 | `agent-drive.md` | Agent Drive | 9 |
 | `preferences.md` | Preferences | 1 |
 | `agent-drive-deprecated.md` | Agent Drive (deprecated paths) | 8 |
+| `tasks-deprecated.md` | Tasks (deprecated paths) | 6 |

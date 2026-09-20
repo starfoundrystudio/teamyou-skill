@@ -47,7 +47,7 @@ GET /projects
 POST /projects
 ```
 
-Creates a project. Optional `todos` and `refs` arrays let one call stand up a whole body of work instead of 1+N+M round trips - the project, every todo and every reference are written in a SINGLE transaction, so a failure anywhere leaves nothing behind (no half-built project to clean up). Array order is the order in both arrays; there are no per-item positions. Create-only: no upsert, no dedupe, no idempotency key, no partial success. The response is always the hydrated project (plan + refs + progress), whether or not children were sent, so no follow-up read is needed.
+Creates a project. Optional `todos` and `refs` arrays let one call stand up a whole body of work instead of 1+N+M round trips - the project, every task and every reference are written in a SINGLE transaction, so a failure anywhere leaves nothing behind (no half-built project to clean up). Array order is the order in both arrays; there are no per-item positions. Create-only: no upsert, no dedupe, no idempotency key, no partial success. The response is always the hydrated project (plan + refs + progress), whether or not children were sent, so no follow-up read is needed.
 
 **Skill CLI:** `teamyou.sh ty projects create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--todo <title>]... [--ref <type>:<value>]... [--from-json <file>]`
 
@@ -61,9 +61,9 @@ Creates a project. Optional `todos` and `refs` arrays let one call stand up a wh
 | `waitingOn` | string \| null | no | Who or what the work is blocked on — a short name or phrase ("Bill", "legal review"), not a status update. Both project surfaces render it in a narrow fixed-width slot and truncate what does not fit, so prose written here is stored but never read. Meaningful when status=waiting, though not enforced against it: a project can carry this while active. — len 0..1000 |
 | `preset` | string \| null | no | Reserved; unused in v1. — len 0..255 |
 | `notes` | string \| null | no | Narrative markdown body: what this project is, in prose. Stored verbatim. — len 0..50000 |
-| `dueDate` | string \| null | no | Calendar day (YYYY-MM-DD) to aim at. A soft target only. Not a date-time instant, unlike a todo dueDate. — pattern |
-| `todos` | InlineProjectTodo[] | no | Optional plan to create with the project. Array order IS the plan order. Written in the same transaction as the project: all-or-nothing, so a failure anywhere creates nothing. Create-only - there is no upsert or dedupe, so two identical calls create two projects. — max 200 items |
-| `refs` | InlineProjectRef[] | no | Optional references to create with the project. Each entry is a FLAT target object (`{"targetType":"url","url":"https://example.com/spec","title":"Spec"}`), NOT the refs-add `{"target":{...}}` wrapper. Array order IS the order. Same transaction and all-or-nothing semantics as `todos`. Naming the same target twice in one array is a 400. Refs cannot target the todos created in the same call (those ids do not exist yet) - add them afterwards with refs-add. — max 100 items |
+| `dueDate` | string \| null | no | Calendar day (YYYY-MM-DD) to aim at. A soft target only. Not a date-time instant, unlike a task dueDate. — pattern |
+| `todos` | InlineProjectTask[] | no | Optional plan to create with the project. Array order IS the plan order. Written in the same transaction as the project: all-or-nothing, so a failure anywhere creates nothing. Create-only - there is no upsert or dedupe, so two identical calls create two projects. — max 200 items |
+| `refs` | InlineProjectRef[] | no | Optional references to create with the project. Each entry is a FLAT target object (`{"targetType":"url","url":"https://example.com/spec","title":"Spec"}`), NOT the refs-add `{"target":{...}}` wrapper. Array order IS the order. Same transaction and all-or-nothing semantics as `todos`. Naming the same target twice in one array is a 400. Refs cannot target the tasks created in the same call (those ids do not exist yet) - add them afterwards with refs-add. — max 100 items |
 
 **Responses:**
 
@@ -80,7 +80,7 @@ Creates a project. Optional `todos` and `refs` arrays let one call stand up a wh
 GET /projects/{id}
 ```
 
-Returns the project with its ordered todo plan, hydrated references, a progress rollup, and `nextAction` in a single request — the agent orientation read. `nextAction` is the first incomplete, non-archived todo by plan position (null when there is none); it is computed per read and never stored, so do not write it back. Dangling refs resolve defensively as { resolved: false, reason: "missing" } rather than failing.
+Returns the project with its ordered task plan, hydrated references, a progress rollup, and `nextAction` in a single request — the agent orientation read. `nextAction` is the first incomplete, non-archived task by plan position (null when there is none); it is computed per read and never stored, so do not write it back. Dangling refs resolve defensively as { resolved: false, reason: "missing" } rather than failing.
 
 **Skill CLI:** `teamyou.sh ty projects get <project_id>`
 
@@ -120,7 +120,7 @@ PUT /projects/{id}
 | `waitingOn` | string \| null | no | Who or what the work is blocked on — a short name or phrase ("Bill", "legal review"), not a status update. Both project surfaces render it in a narrow fixed-width slot and truncate what does not fit, so prose written here is stored but never read. Meaningful when status=waiting, though not enforced against it: a project can carry this while active. — len 0..1000 |
 | `preset` | string \| null | no | len 0..255 |
 | `notes` | string \| null | no | Narrative markdown body: what this project is, in prose. Stored verbatim. — len 0..50000 |
-| `dueDate` | string \| null | no | Calendar day (YYYY-MM-DD) to aim at. A soft target only. Not a date-time instant, unlike a todo dueDate. — pattern |
+| `dueDate` | string \| null | no | Calendar day (YYYY-MM-DD) to aim at. A soft target only. Not a date-time instant, unlike a task dueDate. — pattern |
 
 **Responses:**
 
@@ -138,7 +138,7 @@ PUT /projects/{id}
 DELETE /projects/{id}
 ```
 
-Orphans the project's todos (nulls their projectId + plan position) and cascades its references. The todos themselves are not deleted.
+Orphans the project's tasks (nulls their projectId + plan position) and cascades its references. The tasks themselves are not deleted.
 
 **Skill CLI:** `teamyou.sh ty projects delete <project_id>`
 

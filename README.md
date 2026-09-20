@@ -2,7 +2,7 @@
 
 
 An agent skill for the [TeamYou](https://teamyou.ai) API: knowledge topics, details and
-edges, semantic search, todos, projects and areas, and TY Agent Drive (document and file
+edges, semantic search, tasks, projects and areas, and TY Agent Drive (document and file
 storage for agents, markdown today).
 
 
@@ -79,7 +79,7 @@ TY_DIR="$(cd "$(dirname "$SKILL_MD")" && pwd)"
 
 "$TY_DIR/scripts/teamyou.sh" ty graph topics-list
 "$TY_DIR/scripts/teamyou.sh" ty graph search-topics "italian cooking" medium
-"$TY_DIR/scripts/teamyou.sh" ty todos list --status todo
+"$TY_DIR/scripts/teamyou.sh" ty tasks list --status todo
 "$TY_DIR/scripts/teamyou.sh" ty agent-drive list
 ```
 
@@ -89,7 +89,7 @@ In conversation that looks like:
 "Search my TeamYou topics for anything about Italian cooking"
 "Create a new TeamYou topic called 'Project Ideas' about AI applications"
 "Add these details to topic abc123: Use RAG for context, Focus on mobile UX"
-"Show me my high priority todos"
+"Show me my high priority tasks"
 "Write today's meeting notes to my agent drive and share them with the team"
 ```
 
@@ -99,7 +99,7 @@ In conversation that looks like:
 - **Details** — atomic facts with automatic embedding generation
 - **Edges** — graph relationships between topics, one row covering both directions
 - **Search** — semantic search across topics and details
-- **Todos, projects, areas** — the work surface the human reviews
+- **Tasks, projects, areas** — the work surface the human reviews
 - **TY Agent Drive** — document and file storage for agents (markdown today), with
   per-document sharing
 
