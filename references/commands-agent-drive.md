@@ -11,13 +11,14 @@ Re-pushing the same `--path` replaces that document (whole-document replace).
 - [Five behaviours to know before scripting against it](#five-behaviours-to-know-before-scripting-against-it)
 - [Sharing mechanics](#sharing-mechanics)
 - [Documents shared with your user](#documents-shared-with-your-user)
+- [Front matter and `--where`](#front-matter-and---where)
 - [Examples](#examples)
 - [Reading search results](#reading-search-results)
 
 ## All actions
 
 ```bash
-teamyou.sh ty agent-drive list [--scope mine|shared|all|accessed] [--prefix <path>] [--archived] [--limit N] [--offset N]
+teamyou.sh ty agent-drive list [--scope mine|shared|all|accessed] [--prefix <path>] [--where key:value]... [--archived] [--limit N] [--offset N]
 teamyou.sh ty agent-drive push <file> [--path <path>] [--title <text>]
 teamyou.sh ty agent-drive pull <id> [--out <file>]
 teamyou.sh ty agent-drive delete <id>
@@ -26,7 +27,7 @@ teamyou.sh ty agent-drive unshare <path-or-id>
 teamyou.sh ty agent-drive grant <path-or-id> --email <address>
 teamyou.sh ty agent-drive ungrant <path-or-id> --email <address>
 teamyou.sh ty agent-drive restore <id>
-teamyou.sh ty agent-drive search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--limit N]
+teamyou.sh ty agent-drive search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N]
 ```
 
 ## Five behaviours to know before scripting against it
@@ -94,6 +95,39 @@ already do changes. `--scope shared` shows **only** what has been shared with yo
   `source: "drive-shared"` rather than `"drive"`.
 - The `path` on a shared-in document is its path in **their** Agent Drive.
 
+## Front matter and `--where`
+
+A document may open with a YAML **front-matter** block: `---` on the very first line, some
+`key: value` fields, then `---`. TeamYou parses it on every write into the document's
+`metadata`, which comes back on every `list` row and on `pull`'s document. The block stays
+in the stored content — a `pull` returns exactly the bytes you pushed — and the reader
+shows it as a metadata row above the document rather than as body text.
+
+There is no separate metadata field on `push`, on purpose: the block in the file is the
+only source, so what you write and what you read back can never disagree. Remove the block
+and the next write clears the bag.
+
+`--where key:value` filters `list` and `search` by it, repeatably and AND-ed:
+
+```bash
+teamyou.sh ty agent-drive list --where status:draft --where tags:research
+```
+
+The key is letters, digits, `_` and `-`, up to 64 characters; the value up to 200; the
+split is on the **first** colon, so a value may contain colons. A clause matches a field
+equal to the value **or** a list containing it, so `--where tags:research` finds
+`tags: [research, ops]`. A value that is exactly a number or `true`/`false` is also matched
+against the typed form, so `--where priority:3` finds `priority: 3` whether or not the
+author quoted it. Up to 10 clauses per call. No ranges, no OR, no nested keys. `--where` is
+rejected with `--scope accessed` rather than silently ignored.
+
+Conventional keys — not enforced, and not the only ones allowed: `status`, `type`, and
+`tags` (a list). Prefer them so that documents written by different agents stay filterable
+together.
+
+Filtering only ever **narrows** what `--scope` already returns; no clause can surface a
+document you could not otherwise read.
+
 ## Examples
 
 ```bash
@@ -106,6 +140,9 @@ teamyou.sh ty agent-drive list
 teamyou.sh ty agent-drive list --archived
 teamyou.sh ty agent-drive list --scope shared
 teamyou.sh ty agent-drive list --scope all
+
+# Filter by front-matter metadata (repeat --where to AND clauses)
+teamyou.sh ty agent-drive list --where status:draft --where tags:research
 
 # Read a document, to a file or to stdout
 teamyou.sh ty agent-drive pull DOC_ID --out copy.md
@@ -130,6 +167,7 @@ teamyou.sh ty agent-drive search "standup" --path-prefix "memory/" --limit 5
 teamyou.sh ty agent-drive search "aisle seats" high
 teamyou.sh ty agent-drive search "migration plan" --scope shared
 teamyou.sh ty agent-drive search "migration plan" --scope all
+teamyou.sh ty agent-drive search "migration plan" --where status:draft
 ```
 
 ## Reading search results

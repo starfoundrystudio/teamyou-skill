@@ -21,9 +21,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.3.0"
+SKILL_VERSION="3.4.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_NAl7IHWM2TQX"
+SKILL_VERSION_GUID="vg_pZqltcMbjZu0"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {
@@ -1487,6 +1487,17 @@ url_encode() {
 # number of rows you got back. It is not searchable yet; 'agent-drive search --scope
 # accessed' is rejected rather than silently answering nothing.
 #
+# --where key:value filters by a document's own front matter - the YAML block a
+# document may open with, parsed into its metadata on every write. Repeat the
+# flag to AND clauses:
+#   list --where status:draft --where tags:research
+# The key is letters/digits/_/- up to 64 characters, the value up to 200, and the
+# split is on the first colon so a value may contain colons. A clause matches a
+# field equal to the value OR a list containing it, so --where tags:research
+# finds "tags: [research, ops]". Up to 10 clauses. Not supported with
+# --scope accessed, which rejects it rather than quietly ignoring it. Filtering
+# only ever narrows what --scope already returns.
+#
 # --archived lists ONLY deleted (recoverable) documents; the default lists only
 # live ones. There is no "both" - hiding tombstones by default is the point.
 #
@@ -1507,6 +1518,12 @@ drive_list() {
       --archived) params="${params}&archived=true"; shift ;;
       --scope) params="${params}&scope=$(url_encode "$2")"; shift 2 ;;
       --prefix) params="${params}&pathPrefix=$(url_encode "$2")"; shift 2 ;;
+      # Repeatable: each --where appends ANOTHER where= parameter rather than
+      # replacing the last one, because the API ANDs the repeated parameter and
+      # collapsing them here would silently apply one clause out of several.
+      # Encoded like any other value - a clause carries a colon, and may carry
+      # a space or an & inside the value.
+      --where) params="${params}&where=$(url_encode "$2")"; shift 2 ;;
       --limit) params="${params}&limit=$2"; shift 2 ;;
       --offset) params="${params}&offset=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -1611,15 +1628,25 @@ drive_delete() {
 # about X" without your own drive crowding the results; hits come back with
 # source "drive-shared" and a sharedBy naming the owner. Access is re-checked on
 # every request, so a revoked document is gone from the very next search.
+#
+# --where key:value filters by front-matter metadata, exactly the same grammar
+# 'agent-drive list --where' takes, and is repeatable the same way:
+#   search "migration" --where status:draft --where tags:research
+# It narrows the candidates of all three arms before they are fused, so it
+# combines with the query rather than filtering the ranked list afterwards.
 drive_search() {
   local query=${1:-}
   if [[ $# -gt 0 ]]; then shift; fi
 
   local precision="medium" path_prefix="" limit="" scope=""
+  # Collected as a JSON array because this endpoint takes a BODY - the same
+  # clauses the list command sends as repeated query parameters.
+  local where_clauses=()
   while [[ $# -gt 0 ]]; do
     case $1 in
       --path-prefix) path_prefix=$2; shift 2 ;;
       --scope) scope=$2; shift 2 ;;
+      --where) where_clauses+=("$2"); shift 2 ;;
       --limit) limit=$2; shift 2 ;;
       low|medium|high) precision=$1; shift ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -1633,6 +1660,11 @@ drive_search() {
   # "mine": the server's default IS mine, and an absent field cannot disagree
   # with it. It also means an older CLI and this one send byte-identical bodies
   # for the same command.
+  #
+  # `where` is omitted entirely when no --where was passed, for the same reason
+  # --scope is: an absent field cannot disagree with the server's default, and
+  # an empty array would be a filter that matches everything - the same result
+  # by a different route, sent on every ordinary search.
   local data
   data=$(jq -n \
     --arg query "$query" \
@@ -1640,10 +1672,13 @@ drive_search() {
     --arg prefix "$path_prefix" \
     --arg limit "$limit" \
     --arg scope "$scope" \
+    --args \
     '{query: $query, precision: $precision}
     | if $prefix != "" then . + {pathPrefix: $prefix} else . end
     | if $scope != "" then . + {scope: $scope} else . end
-    | if $limit != "" then . + {limit: ($limit | tonumber)} else . end')
+    | if $limit != "" then . + {limit: ($limit | tonumber)} else . end
+    | if ($ARGS.positional | length) > 0 then . + {where: $ARGS.positional} else . end' \
+    "${where_clauses[@]+"${where_clauses[@]}"}")
 
   api_request POST /search/documents "$data"
 }
@@ -2074,7 +2109,7 @@ TY Agent Drive (ty agent-drive)
 Usage: teamyou.sh ty agent-drive <action> [arguments]
 
 Actions:
-  list [--scope mine|shared|all|accessed] [--prefix <path>] [--archived] [--limit N] [--offset N]
+  list [--scope mine|shared|all|accessed] [--prefix <path>] [--where key:value]... [--archived] [--limit N] [--offset N]
   push <file> [--path <path>] [--title <text>]
   pull <id> [--out <file>]
   delete <id>
@@ -2083,7 +2118,7 @@ Actions:
   grant <path-or-id> --email <address>
   ungrant <path-or-id> --email <address>   # removes that person’s access
   restore <id>
-  search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--limit N]
+  search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N]
 
 TY Agent Drive - document and file storage for agents (markdown today).
 EOF
