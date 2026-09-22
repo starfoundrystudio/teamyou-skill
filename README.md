@@ -124,10 +124,31 @@ validated artifact, extracted and committed. Releases are tagged `vX.Y.Z`, match
 | --- | --- |
 | `version` | the released SemVer, same as the tag |
 | `git_commit` | the source commit in the TeamYou monorepo the payload was built from |
-| `sha256` | the checksum of the published archive these files came out of |
+| `payload_sha256` | a content fingerprint of the payload: the SHA-256 of the sorted `<sha256>  <path>` index of every file, the manifest itself excluded |
 
-Because the tag carries the same bytes as the published archive, `sha256` is how you check
-that an archive you downloaded is the release it claims to be.
+`payload_sha256` is the same value in the published archive and at this tag for a given
+release, so it tells you the two carry the same files. It is not the checksum of the
+archive, and it cannot be: the hash of an archive cannot live inside that archive, because
+writing it in would change the bytes being hashed.
+
+### Verifying a download
+
+The archive's own SHA-256 is published from teamyou.com, outside the archive:
+
+```bash
+curl -s https://www.teamyou.com/api/skill/install
+```
+
+Download the zip at `install.artifactUrl`, then compare the file's SHA-256 with
+`install.sha256`: `sha256sum` on Linux and Git Bash, `shasum -a 256` on macOS, or
+`(Get-FileHash <file> -Algorithm SHA256).Hash` in PowerShell (uppercase; compare
+case-insensitively). Do not install if they differ. The same value appears on
+<https://www.teamyou.com/llms.txt>.
+
+The value is computed by teamyou.com from the bytes it currently serves at that URL, so a
+match tells you your download is exactly what TeamYou is publishing right now, intact and
+current. The publish procedure separately checks that value against the archive the release
+was built from.
 
 ## License
 
