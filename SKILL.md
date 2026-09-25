@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, or to write, read, or share a document on the agent drive.
 metadata:
-  version: '3.4.1'
+  version: '3.5.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -117,6 +117,7 @@ Long form, the entity mapping and worked workflows:
 | `areas`       | `refs-add` (file a topic), `get --depth full`       | [commands-areas.md](references/commands-areas.md)             |
 | `agent-drive` | `push`, `search`                                    | [commands-agent-drive.md](references/commands-agent-drive.md) |
 | `agent`       | `register`, `whoami`                                | [commands-agent.md](references/commands-agent.md)             |
+| `search`      | `<query>` (every type, one list), `related`         | [commands-search.md](references/commands-search.md)           |
 
 
 Old pattern: the Agent Drive noun changed from `ty drive` to `ty agent-drive`; the old spelling still runs and says so on stderr, so use `ty agent-drive` everywhere.
@@ -140,6 +141,9 @@ TOPIC_ID=$("$TY_DIR/scripts/teamyou.sh" ty graph topics-create "Italian Cooking"
 # Documents: write a markdown file to TY Agent Drive (private), and search it
 "$TY_DIR/scripts/teamyou.sh" ty agent-drive push notes.md --path "notes/standup.md" --title "Standup notes"
 "$TY_DIR/scripts/teamyou.sh" ty agent-drive search "what blocked the migration"
+
+# Not sure where something lives? One ranked list across every type
+"$TY_DIR/scripts/teamyou.sh" ty search "cabin build" --limit 10
 ```
 
 ## Notices
@@ -170,8 +174,12 @@ authenticate with the same `Authorization: Bearer ty_<key>` you use here (OAuth 
 later). Each tool is named for one service at one permission level - `graph_read` /
 `graph_write`, `tasks_read` / `tasks_write`, `agent_drive_read` / `agent_drive_write` /
 `agent_drive_sharing` - and takes a required `action` argument whose values are the same
-verbs this helper uses. A small default set is advertised; `?tools=extended` on the server
-URL puts the full API behind it, adding the remaining services and replacing the tools
+verbs this helper uses. The one exception to that naming is `search` (actions `search` and
+`related`, the same calls as `ty search` and `ty search related`): one ranked list across
+every type, and the items one hop from one item, needing only `read`; use it before acting
+on a vague question about what the user already has. A small default set is
+advertised; `?tools=extended` on the server URL puts the full API behind it, adding the
+remaining services and replacing the tools
 whose action set grows with `_all` twins, so a tool name always identifies one action set.
 The tool catalogue is generated from the same OpenAPI contract as the reference files
 below, so a tool never describes an operation differently from `GET /openapi.json`. Use MCP

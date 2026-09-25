@@ -29,6 +29,15 @@ retryable — scopes cannot be edited after creation, so the fix is a new key, n
 attempt. Scopes are separate from the account-wide AI preferences and compose with them as
 AND: a call needs the scope on its key AND the preference on the account.
 
+## Contents
+
+- [Authentication](#authentication)
+- [Base URL](#base-url)
+- [Rate limits](#rate-limits)
+- [Discovery](#discovery)
+- [MCP](#mcp)
+- [Reference files](#reference-files)
+
 ## Authentication
 
 All requests except `GET /openapi.json` require an API key:
@@ -71,8 +80,10 @@ The same operations are served over the Model Context Protocol at
 `Authorization: Bearer ty_<key>` as above (OAuth comes later). Each tool is named for one
 service at one permission level (`graph_read` / `graph_write`, `tasks_read` / `tasks_write`,
 `agent_drive_read` / `agent_drive_write` / `agent_drive_sharing`, …) and takes a required
-`action` argument naming the operation to run. 7 tools are advertised by
-default; `?tools=extended` widens that to 18 — it adds the remaining
+`action` argument naming the operation to run. The one exception to the naming is `search`
+(`POST /search/all`), which ranks every type in one list and needs only `read`.
+8 tools are advertised by
+default; `?tools=extended` widens that to 19 — it adds the remaining
 services AND replaces the tools whose action set grows with `_all` twins (`graph_write_all`
 and so on), so a tool name always identifies exactly one action set. The catalogue is
 generated from this contract, so no tool describes an operation differently from the
@@ -87,7 +98,7 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `topics.md` | Topics | 5 |
 | `details.md` | Details | 4 |
 | `edges.md` | Edges | 4 |
-| `search.md` | Search | 2 |
+| `search.md` | Search | 4 |
 | `tasks.md` | Tasks | 6 |
 | `projects.md` | Projects | 9 |
 | `areas.md` | Areas | 8 |

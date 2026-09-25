@@ -21,9 +21,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.4.1"
+SKILL_VERSION="3.5.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_reyu8Yk20l0y"
+SKILL_VERSION_GUID="vg_4g5dVsgZl3mK"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {
@@ -96,6 +96,18 @@ require_value() {
       exit 1
       ;;
   esac
+}
+
+# A value-taking flag must be followed by a value (TYDEV-1252). Checks PRESENCE
+# only: an empty string or a dash-leading value is still passed through, because
+# free text ("- item") and clearing a field ("") are legitimate. Call it with the
+# CURRENT $#, before reading $2 or running `shift 2`.
+require_flag_arg() {
+  if (( $2 < 2 )); then
+    echo "Error: $1 requires a value" >&2
+    echo "Run 'teamyou.sh $TY_HELP_CONTEXT -h' for usage" >&2
+    exit 1
+  fi
 }
 
 validate_action_type() {
@@ -301,7 +313,7 @@ topics_create() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --summary) summary=$2; shift 2 ;;
+      --summary) require_flag_arg "--summary" $#; summary=$2; shift 2 ;;
       *)
         if [[ -z "$name" ]]; then
           name=$1; shift
@@ -342,9 +354,9 @@ topics_update() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --name) name=$2; shift 2 ;;
-      --description) description=$2; shift 2 ;;
-      --summary) summary=$2; shift 2 ;;
+      --name) require_flag_arg "--name" $#; name=$2; shift 2 ;;
+      --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
+      --summary) require_flag_arg "--summary" $#; summary=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -602,11 +614,11 @@ tasks_list() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --status) params="${params}&status=$2"; shift 2 ;;
+      --status) require_flag_arg "--status" $#; params="${params}&status=$2"; shift 2 ;;
       --archived) params="${params}&archived=true"; shift ;;
-      --priority) params="${params}&priority=$2"; shift 2 ;;
-      --order-by) params="${params}&orderBy=$2"; shift 2 ;;
-      --limit) params="${params}&limit=$2"; shift 2 ;;
+      --priority) require_flag_arg "--priority" $#; params="${params}&priority=$2"; shift 2 ;;
+      --order-by) require_flag_arg "--order-by" $#; params="${params}&orderBy=$2"; shift 2 ;;
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -628,10 +640,10 @@ tasks_create() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --description) description=$2; shift 2 ;;
-      --status) status=$2; shift 2 ;;
-      --priority) priority=$2; shift 2 ;;
-      --due-date) due_date=$2; shift 2 ;;
+      --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
+      --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
+      --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
+      --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
       --topic-id)
         if [[ $# -lt 2 || "$2" == -* ]]; then
           echo "Error: --topic-id requires a value" >&2
@@ -648,8 +660,8 @@ tasks_create() {
         project_id=$2
         shift 2
         ;;
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -697,11 +709,11 @@ tasks_update() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --title) title=$2; shift 2 ;;
-      --description) description=$2; shift 2 ;;
-      --status) status=$2; shift 2 ;;
-      --priority) priority=$2; shift 2 ;;
-      --due-date) due_date=$2; shift 2 ;;
+      --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
+      --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
+      --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
+      --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
+      --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
       --archived) archived="true"; shift ;;
       --topic-id)
         if [[ $# -lt 2 || "$2" == -* ]]; then
@@ -721,8 +733,8 @@ tasks_update() {
         shift 2
         ;;
       --no-project) clear_project="true"; shift ;;
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -801,8 +813,8 @@ projects_list() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --status) params="${params}&status=$2"; shift 2 ;;
-      --limit) params="${params}&limit=$2"; shift 2 ;;
+      --status) require_flag_arg "--status" $#; params="${params}&status=$2"; shift 2 ;;
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -842,15 +854,17 @@ projects_create() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --goal) goal=$2; shift 2 ;;
-      --status) status=$2; shift 2 ;;
-      --waiting-on) waiting_on=$2; shift 2 ;;
-      --notes) notes=$2; shift 2 ;;
-      --due-date) due_date=$2; shift 2 ;;
+      --goal) require_flag_arg "--goal" $#; goal=$2; shift 2 ;;
+      --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
+      --waiting-on) require_flag_arg "--waiting-on" $#; waiting_on=$2; shift 2 ;;
+      --notes) require_flag_arg "--notes" $#; notes=$2; shift 2 ;;
+      --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
       --todo)
+        require_flag_arg "--todo" $#
         todos_json=$(jq -c --arg title "$2" '. + [{title: $title}]' <<<"$todos_json")
         shift 2 ;;
       --ref)
+        require_flag_arg "--ref" $#
         ref_spec=$2
         if [[ "$ref_spec" != *:* ]]; then
           echo "Error: --ref must be <type>:<value>, e.g. topic:abc123 or url:https://example.com" >&2
@@ -874,7 +888,7 @@ projects_create() {
             exit 1 ;;
         esac
         shift 2 ;;
-      --from-json) from_json=$2; shift 2 ;;
+      --from-json) require_flag_arg "--from-json" $#; from_json=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -928,12 +942,12 @@ projects_update() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --name) name=$2; shift 2 ;;
-      --goal) goal=$2; shift 2 ;;
-      --status) status=$2; shift 2 ;;
-      --waiting-on) waiting_on=$2; shift 2 ;;
-      --notes) notes=$2; shift 2 ;;
-      --due-date) due_date=$2; shift 2 ;;
+      --name) require_flag_arg "--name" $#; name=$2; shift 2 ;;
+      --goal) require_flag_arg "--goal" $#; goal=$2; shift 2 ;;
+      --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
+      --waiting-on) require_flag_arg "--waiting-on" $#; waiting_on=$2; shift 2 ;;
+      --notes) require_flag_arg "--notes" $#; notes=$2; shift 2 ;;
+      --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
       --no-goal) clear_goal="true"; shift ;;
       --no-waiting-on) clear_waiting="true"; shift ;;
       --no-notes) clear_notes="true"; shift ;;
@@ -988,12 +1002,12 @@ projects_refs_add() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --target-type) target_type=$2; shift 2 ;;
-      --target-id) target_id=$2; shift 2 ;;
-      --url) url=$2; shift 2 ;;
-      --title) title=$2; shift 2 ;;
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --target-type) require_flag_arg "--target-type" $#; target_type=$2; shift 2 ;;
+      --target-id) require_flag_arg "--target-id" $#; target_id=$2; shift 2 ;;
+      --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
+      --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1045,11 +1059,11 @@ projects_doc_push() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --path) path=$2; shift 2 ;;
-      --title) title=$2; shift 2 ;;
-      --ref-title) ref_title=$2; shift 2 ;;
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --path) require_flag_arg "--path" $#; path=$2; shift 2 ;;
+      --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
+      --ref-title) require_flag_arg "--ref-title" $#; ref_title=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1109,8 +1123,8 @@ projects_refs_reorder() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1156,7 +1170,7 @@ areas_list() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --include-archived) params="${params}&includeArchived=true"; shift ;;
-      --limit) params="${params}&limit=$2"; shift 2 ;;
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1178,7 +1192,7 @@ areas_create() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --description) description=$2; shift 2 ;;
+      --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
       --archived) archived="true"; shift ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -1205,7 +1219,7 @@ areas_get() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --depth) depth=$2; shift 2 ;;
+      --depth) require_flag_arg "--depth" $#; depth=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1227,8 +1241,8 @@ areas_update() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --name) name=$2; shift 2 ;;
-      --description) description=$2; shift 2 ;;
+      --name) require_flag_arg "--name" $#; name=$2; shift 2 ;;
+      --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
       --no-description) clear_description="true"; shift ;;
       --archived) archived="true"; shift ;;
       --no-archived) no_archived="true"; shift ;;
@@ -1270,12 +1284,12 @@ areas_refs_add() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --target-type) target_type=$2; shift 2 ;;
-      --target-id) target_id=$2; shift 2 ;;
-      --url) url=$2; shift 2 ;;
-      --title) title=$2; shift 2 ;;
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --target-type) require_flag_arg "--target-type" $#; target_type=$2; shift 2 ;;
+      --target-id) require_flag_arg "--target-id" $#; target_id=$2; shift 2 ;;
+      --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
+      --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1323,8 +1337,8 @@ areas_refs_reorder() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --after) after=$2; shift 2 ;;
-      --before) before=$2; shift 2 ;;
+      --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
+      --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1377,11 +1391,11 @@ agent_register() {
 
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --slug) slug=$2; slug_explicit="true"; shift 2 ;;
-      --openclaw-instance-id) openclaw_instance_id=$2; shift 2 ;;
-      --kind) kind=$2; shift 2 ;;
-      --name) display_name=$2; shift 2 ;;
-      --model) model=$2; shift 2 ;;
+      --slug) require_flag_arg "--slug" $#; slug=$2; slug_explicit="true"; shift 2 ;;
+      --openclaw-instance-id) require_flag_arg "--openclaw-instance-id" $#; openclaw_instance_id=$2; shift 2 ;;
+      --kind) require_flag_arg "--kind" $#; kind=$2; shift 2 ;;
+      --name) require_flag_arg "--name" $#; display_name=$2; shift 2 ;;
+      --model) require_flag_arg "--model" $#; model=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1516,16 +1530,16 @@ drive_list() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --archived) params="${params}&archived=true"; shift ;;
-      --scope) params="${params}&scope=$(url_encode "$2")"; shift 2 ;;
-      --prefix) params="${params}&pathPrefix=$(url_encode "$2")"; shift 2 ;;
+      --scope) require_flag_arg "--scope" $#; params="${params}&scope=$(url_encode "$2")"; shift 2 ;;
+      --prefix) require_flag_arg "--prefix" $#; params="${params}&pathPrefix=$(url_encode "$2")"; shift 2 ;;
       # Repeatable: each --where appends ANOTHER where= parameter rather than
       # replacing the last one, because the API ANDs the repeated parameter and
       # collapsing them here would silently apply one clause out of several.
       # Encoded like any other value - a clause carries a colon, and may carry
       # a space or an & inside the value.
-      --where) params="${params}&where=$(url_encode "$2")"; shift 2 ;;
-      --limit) params="${params}&limit=$2"; shift 2 ;;
-      --offset) params="${params}&offset=$2"; shift 2 ;;
+      --where) require_flag_arg "--where" $#; params="${params}&where=$(url_encode "$2")"; shift 2 ;;
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
+      --offset) require_flag_arg "--offset" $#; params="${params}&offset=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1546,7 +1560,7 @@ drive_pull() {
   local out=""
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --out) out=$2; shift 2 ;;
+      --out) require_flag_arg "--out" $#; out=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1573,8 +1587,8 @@ drive_push() {
   local path="" title=""
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --path) path=$2; shift 2 ;;
-      --title) title=$2; shift 2 ;;
+      --path) require_flag_arg "--path" $#; path=$2; shift 2 ;;
+      --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1644,10 +1658,10 @@ drive_search() {
   local where_clauses=()
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --path-prefix) path_prefix=$2; shift 2 ;;
-      --scope) scope=$2; shift 2 ;;
-      --where) where_clauses+=("$2"); shift 2 ;;
-      --limit) limit=$2; shift 2 ;;
+      --path-prefix) require_flag_arg "--path-prefix" $#; path_prefix=$2; shift 2 ;;
+      --scope) require_flag_arg "--scope" $#; scope=$2; shift 2 ;;
+      --where) require_flag_arg "--where" $#; where_clauses+=("$2"); shift 2 ;;
+      --limit) require_flag_arg "--limit" $#; limit=$2; shift 2 ;;
       low|medium|high) precision=$1; shift ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -1752,7 +1766,7 @@ drive_share() {
   local audience="public"
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --audience) audience=$2; shift 2 ;;
+      --audience) require_flag_arg "--audience" $#; audience=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1835,7 +1849,7 @@ drive_grant_request() {
   local email=""
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --email) email=$2; shift 2 ;;
+      --email) require_flag_arg "--email" $#; email=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
   done
@@ -1872,6 +1886,121 @@ dispatch_ty_agent_drive() {
 }
 
 # ============================================================================
+# ty search - one ranked list across every type (TYDEV-1228)
+# ============================================================================
+
+# POST /search/all. Flags map onto the body the way drive_search's do: every
+# optional field is OMITTED when its flag is unset, so the server's own default
+# decides and an absent field cannot disagree with it; --types is split on
+# commas into an array; --limit goes through tonumber because the API rejects a
+# string. Every value-taking flag checks its value with require_value BEFORE
+# `shift 2`: a trailing flag with no value would otherwise make `shift 2` fail
+# without shifting, which exits silently under `set -e` and loops forever in any
+# caller that has it off.
+#
+# The query is optional only because an empty one is meaningful with
+# --order-by recency (the most recently updated items). A first argument that
+# starts with "--" is a flag, not a query.
+search_all() {
+  local query=""
+  if [[ $# -gt 0 && "$1" != --* ]]; then
+    query=$1
+    shift
+  fi
+
+  local types="" scope="" precision="" order_by="" limit=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --types) require_value "--types" "${2:-}"; types=$2; shift 2 ;;
+      --scope) require_value "--scope" "${2:-}"; scope=$2; shift 2 ;;
+      --precision) require_value "--precision" "${2:-}"; precision=$2; shift 2 ;;
+      --order-by) require_value "--order-by" "${2:-}"; order_by=$2; shift 2 ;;
+      --limit) require_value "--limit" "${2:-}"; limit=$2; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  # Said here rather than left to the API's 400, because the fix is a flag the
+  # caller may not know exists.
+  if [[ -z "${query// /}" && "$order_by" != "recency" ]]; then
+    echo "Error: query requires a value (or pass --order-by recency to list the most recently updated items)" >&2
+    exit 1
+  fi
+
+  local data
+  data=$(jq -n \
+    --arg query "$query" \
+    --arg types "$types" \
+    --arg scope "$scope" \
+    --arg precision "$precision" \
+    --arg order_by "$order_by" \
+    --arg limit "$limit" \
+    '{query: $query}
+    | if $types != "" then . + {types: ($types | split(",") | map(gsub("^ +| +$"; "")) | map(select(. != "")))} else . end
+    | if $scope != "" then . + {scope: $scope} else . end
+    | if $precision != "" then . + {precision: $precision} else . end
+    | if $order_by != "" then . + {orderBy: $order_by} else . end
+    | if $limit != "" then . + {limit: ($limit | tonumber)} else . end')
+
+  api_request POST /search/all "$data"
+}
+
+# POST /search/related: the items one hop from one item, each with its
+# relation. Both positionals are required; --limit is omitted when unset so the
+# server's default decides, and goes through tonumber because the API rejects a
+# string.
+search_related() {
+  local type="" id=""
+  if [[ $# -gt 0 && "$1" != --* ]]; then type=$1; shift; fi
+  if [[ $# -gt 0 && "$1" != --* ]]; then id=$1; shift; fi
+  require_value "type (topic|detail|task|project|area|document)" "$type"
+  require_value "id" "$id"
+
+  local limit=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --limit) require_value "--limit" "${2:-}"; limit=$2; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  local data
+  data=$(jq -n \
+    --arg type "$type" \
+    --arg id "$id" \
+    --arg limit "$limit" \
+    '{type: $type, id: $id}
+    | if $limit != "" then . + {limit: ($limit | tonumber)} else . end')
+
+  api_request POST /search/related "$data"
+}
+
+# `search` is the IMPLICIT action: `ty search <query>` is the call, and
+# `ty search search <query>` is its explicit spelling (what the generated
+# reference prints). The explicit word is consumed only when something follows
+# it, so `ty search search` alone still searches for the word "search".
+#
+# `related` is the one other action: `ty search related <type> <id>`. To search
+# for the word "related" itself, spell the action: `ty search search related`.
+dispatch_ty_search() {
+  ty_dispatch_begin "ty search" show_ty_search_help "$@" && return 0
+
+  case "$1" in
+    -h|--help) show_ty_search_help; return 0 ;;
+    related)
+      shift
+      search_related "$@"
+      return
+      ;;
+    search)
+      if [[ $# -gt 1 ]]; then shift; fi
+      ;;
+  esac
+
+  search_all "$@"
+}
+
+# ============================================================================
 # ty routines — Heartbeat and Scheduled Actions (feature-flagged)
 # ============================================================================
 
@@ -1897,6 +2026,7 @@ dispatch_ty() {
     areas) dispatch_ty_areas "$@" ;;
     agent) dispatch_ty_agent "$@" ;;
     agent-drive) dispatch_ty_agent_drive "$@" ;;
+    search) dispatch_ty_search "$@" ;;
     # The retired noun (TYDEV-1119), kept working for agents already in the
     # field. Hidden: it is absent from every help table, so nothing teaches it
     # to a new agent. The warning goes to STDERR and the dispatch is the same
@@ -1964,6 +2094,7 @@ Services:
   areas          Cross-pillar contexts (membership + rollup)
   agent          Agent registration and identity
   agent-drive    TY Agent Drive - document/file storage (markdown today)
+  search         One ranked search across every type (ty search <query>)
 EOF
 
 
@@ -2124,6 +2255,34 @@ TY Agent Drive - document and file storage for agents (markdown today).
 EOF
 }
 # GENERATED-FROM-OPENAPI:agent-drive:end
+
+# GENERATED-FROM-OPENAPI:search:start
+show_ty_search_help() {
+  cat <<'EOF'
+TeamYou Search (ty search)
+
+Usage: teamyou.sh ty search <query> [options]
+
+Actions:
+  search <query> [--types t1,t2] [--scope mine|shared|all] [--precision high|medium|low] [--order-by relevance|recency] [--limit N]
+  related <type> <id> [--limit N]
+
+Notes:
+  The action word is optional: 'ty search <query>' is the same call as
+  'ty search search <query>'. One ranked list across topics, details, tasks,
+  projects, areas and TY Agent Drive documents.
+  --types takes a comma-separated list of: topic, detail, task, project,
+  area, document. Omit it to search every type.
+  --scope applies to documents only.
+  An empty query needs --order-by recency, and lists the most recently
+  updated items.
+  related <type> <id> lists the items one hop from one item (a topic's
+  details and linked topics, a project's tasks, documents and areas, ...),
+  each with its relation. To search for the word itself, run
+  'ty search search related'.
+EOF
+}
+# GENERATED-FROM-OPENAPI:search:end
 
 
 
