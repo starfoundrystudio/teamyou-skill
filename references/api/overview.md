@@ -15,8 +15,14 @@ If an automated call is unexpectedly rejected, stop and report it rather than ch
 client identifies itself.
 
 **MCP.** The same operations are also served over the Model Context Protocol at
-`https://www.teamyou.com/mcp` — same keys, same scopes, same handlers; the tool catalogue is
-generated from this contract.
+`https://www.teamyou.com/mcp` — same scopes, same handlers; the tool catalogue is generated from
+this contract. Authentication follows the client: OAuth for the ones that speak it (Claude
+Code, Claude Desktop / claude.ai, Cursor, Codex, ChatGPT), and `Authorization: Bearer
+ty_<key>` for header-only clients.
+A read-only server is at `https://www.teamyou.com/mcp/readonly`: only the reading tools are offered, a
+sign-in there asks for `read` alone, and a key presented there can change nothing whatever
+scopes it holds.
+https://www.teamyou.com/mcp/install says which is which and carries the configuration for each.
 
 All endpoints require `Authorization: Bearer ty_<key>` except `GET /openapi.json`. Any 2xx body
 may also carry an optional `agent_ecosystem_notice` when the calling skill client is outdated.
@@ -76,16 +82,22 @@ Public machine-readable contract. No authentication required.
 ## MCP
 
 The same operations are served over the Model Context Protocol at
-`https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers, and the same
-`Authorization: Bearer ty_<key>` as above (OAuth comes later). Each tool is named for one
-service at one permission level (`graph_read` / `graph_write`, `tasks_read` / `tasks_write`,
-`agent_drive_read` / `agent_drive_write` / `agent_drive_sharing`, …) and takes a required
+`https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers.
+Authentication follows the client: OAuth for the ones that speak it (Claude Code, Claude
+Desktop / claude.ai, Cursor, Codex, ChatGPT), and the same `Authorization: Bearer ty_<key>`
+as above for header-only clients.
+https://www.teamyou.com/mcp/install says which is which and carries the configuration for each.
+Each tool is named for one
+pillar at one permission level (`knowledge_read` / `knowledge_write`, `work_read` / `work_write`,
+`agent_drive_read` / `agent_drive_write`, and `sharing`) and takes a required
 `action` argument naming the operation to run. The one exception to the naming is `search`
-(`POST /search/all`), which ranks every type in one list and needs only `read`.
+(`POST /search/all` and `POST /search/related`), which belongs to no pillar because it
+crosses every store, and needs only `read`.
 8 tools are advertised by
-default; `?tools=extended` widens that to 19 — it adds the remaining
-services AND replaces the tools whose action set grows with `_all` twins (`graph_write_all`
-and so on), so a tool name always identifies exactly one action set. The catalogue is
+default and carry every knowledge, work and Agent Drive operation plus `search`; `?tools=extended`
+widens that to 10 with the Team pillar (`team_read` / `team_write`: agent
+identity and preferences, instructions, routines, state). A tool name identifies exactly
+one action set. The catalogue is
 generated from this contract, so no tool describes an operation differently from the
 reference files below.
 

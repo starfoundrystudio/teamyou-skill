@@ -47,9 +47,9 @@ GET /projects
 POST /projects
 ```
 
-Creates a project. Optional `todos` and `refs` arrays let one call stand up a whole body of work instead of 1+N+M round trips - the project, every task and every reference are written in a SINGLE transaction, so a failure anywhere leaves nothing behind (no half-built project to clean up). Array order is the order in both arrays; there are no per-item positions. Create-only: no upsert, no dedupe, no idempotency key, no partial success. The response is always the hydrated project (plan + refs + progress), whether or not children were sent, so no follow-up read is needed.
+Creates a project. Optional `tasks` and `refs` arrays let one call stand up a whole body of work instead of 1+N+M round trips - the project, every task and every reference are written in a SINGLE transaction, so a failure anywhere leaves nothing behind (no half-built project to clean up). Array order is the order in both arrays; there are no per-item positions. Create-only: no upsert, no dedupe, no idempotency key, no partial success. The response is always the hydrated project (plan + refs + progress), whether or not children were sent, so no follow-up read is needed.
 
-**Skill CLI:** `teamyou.sh ty projects create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--todo <title>]... [--ref <type>:<value>]... [--from-json <file>]`
+**Skill CLI:** `teamyou.sh ty projects create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--task <title>]... [--ref <type>:<value>]... [--from-json <file>]`
 
 **Request body:**
 
@@ -62,8 +62,8 @@ Creates a project. Optional `todos` and `refs` arrays let one call stand up a wh
 | `preset` | string \| null | no | Reserved; unused in v1. — len 0..255 |
 | `notes` | string \| null | no | Narrative markdown body: what this project is, in prose. Stored verbatim. — len 0..50000 |
 | `dueDate` | string \| null | no | Calendar day (YYYY-MM-DD) to aim at. A soft target only. Not a date-time instant, unlike a task dueDate. — pattern |
-| `todos` | InlineProjectTask[] | no | Optional plan to create with the project. Array order IS the plan order. Written in the same transaction as the project: all-or-nothing, so a failure anywhere creates nothing. Create-only - there is no upsert or dedupe, so two identical calls create two projects. — max 200 items |
-| `refs` | InlineProjectRef[] | no | Optional references to create with the project. Each entry is a FLAT target object (`{"targetType":"url","url":"https://example.com/spec","title":"Spec"}`), NOT the refs-add `{"target":{...}}` wrapper. Array order IS the order. Same transaction and all-or-nothing semantics as `todos`. Naming the same target twice in one array is a 400. Refs cannot target the tasks created in the same call (those ids do not exist yet) - add them afterwards with refs-add. — max 100 items |
+| `tasks` | InlineProjectTask[] | no | Optional plan to create with the project. Array order IS the plan order. Written in the same transaction as the project: all-or-nothing, so a failure anywhere creates nothing. Create-only - there is no upsert or dedupe, so two identical calls create two projects. — max 200 items |
+| `refs` | InlineProjectRef[] | no | Optional references to create with the project. Each entry is a FLAT target object (`{"targetType":"url","url":"https://example.com/spec","title":"Spec"}`), NOT the refs-add `{"target":{...}}` wrapper. Array order IS the order. Same transaction and all-or-nothing semantics as `tasks`. Naming the same target twice in one array is a 400. Refs cannot target the tasks created in the same call (those ids do not exist yet) - add them afterwards with refs-add. — max 100 items |
 
 **Responses:**
 
@@ -162,9 +162,9 @@ Orphans the project's tasks (nulls their projectId + plan position) and cascades
 POST /projects/{id}/refs
 ```
 
-Links a project to a topic/todo/project/doc/url. Re-adding an existing target returns 409. `area`/`entity` targets are rejected (D5).
+Links a project to a topic/task/project/doc/url. Re-adding an existing target returns 409. `area`/`entity` targets are rejected (D5).
 
-**Skill CLI:** `teamyou.sh ty projects refs-add <project_id> --target-type topic|todo|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]`
+**Skill CLI:** `teamyou.sh ty projects refs-add <project_id> --target-type topic|task|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]`
 
 **Parameters:**
 
@@ -174,7 +174,7 @@ Links a project to a topic/todo/project/doc/url. Re-adding an existing target re
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `target` | object \| object | yes | The reference target. `url` targets carry a url; all others carry a targetId. Accepted targetType: topic\|todo\|project\|doc\|url — `area` and `entity` are rejected by the projects API. |
+| `target` | object \| object | yes | The reference target. `url` targets carry a url; all others carry a targetId. Accepted targetType: topic\|task\|project\|doc\|url — `area` and `entity` are rejected by the projects API. |
 | `position` | RefPosition | no | Where in the ref list to place it; omit to append. |
 
 **Responses:**

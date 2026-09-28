@@ -6,7 +6,10 @@
 set -e
 
 BASE_URL="${TEAMYOU_API_URL:-https://www.teamyou.com/api/external/v1}"
-SUPPORTED_ACTION_TYPES=("check_todos" "openclaw_command" "custom_webhook")
+SUPPORTED_ACTION_TYPES=("check_tasks" "openclaw_command" "custom_webhook")
+# The retired spelling of check_tasks, still accepted from a caller (and not
+# listed in any help or error text). See wire_action_type.
+LEGACY_ACTION_TYPES=("check_todos")
 
 # Distinct exit code for a `403 client_update_nudge` (the capability-aware nag,
 # TYDEV-975/987) — kept OUT of the generic error code (1) so an agent can branch on
@@ -21,9 +24,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.5.0"
+SKILL_VERSION="3.6.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_4g5dVsgZl3mK"
+SKILL_VERSION_GUID="vg_YhGmNRBXtDnU"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {
@@ -114,7 +117,7 @@ validate_action_type() {
   local action_type=$1
   local supported=false
 
-  for current in "${SUPPORTED_ACTION_TYPES[@]}"; do
+  for current in "${SUPPORTED_ACTION_TYPES[@]}" "${LEGACY_ACTION_TYPES[@]}"; do
     if [[ "$current" == "$action_type" ]]; then
       supported=true
       break
@@ -125,6 +128,29 @@ validate_action_type() {
     echo "Error: Unsupported action type '$action_type'. Supported: ${SUPPORTED_ACTION_TYPES[*]}" >&2
     exit 1
   fi
+}
+
+# The action type as it goes on the WIRE. The CLI says check_tasks; the body
+# still says check_todos, because a server older than contract 2.9.0 (TYDEV-1257)
+# 400s on check_tasks and every server accepts check_todos. The wire spelling
+# flips with the skill version floor in step B
+# (https://linear.app/starfoundry/issue/TYDEV-1232).
+#
+# printf, not echo, in both helpers: they pass unknown values through, and
+# `echo "-n"` / `echo "-e"` would swallow the value as an option.
+wire_action_type() {
+  case "$1" in
+    check_tasks) printf '%s\n' "check_todos" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+# A ref/anchor type as it goes on the wire: task -> todo, for the same reason.
+wire_target_type() {
+  case "$1" in
+    task) printf '%s\n' "todo" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
 }
 
 validate_config_json() {
@@ -831,15 +857,22 @@ projects_list() {
 # call. The API writes everything in one transaction, so a failure anywhere
 # creates nothing - there is no half-built project to clean up.
 #
-# --todo and --ref are repeatable and FLAG ORDER IS THE ORDER; there are no
+# --task and --ref are repeatable and FLAG ORDER IS THE ORDER; there are no
 # per-item positions. --ref takes <type>:<value>, e.g. topic:abc123 or
-# url:https://example.com; it cannot point at a --todo from the same call
+# url:https://example.com; it cannot point at a --task from the same call
 # because those ids do not exist yet (add those with refs-add afterwards).
 #
 # --from-json <file> is a client-side convenience only: the file is merged OVER
-# the flag-built body and posted as the same JSON, which is how per-todo
+# the flag-built body and posted as the same JSON, which is how per-task
 # status/priority/dueDate/topicId are reached without a flag for each. The API
 # gains no file surface.
+#
+# The CLI says task; the BODY still says todos / targetType "todo" (TYDEV-1257,
+# D6). A server older than contract 2.9.0 strips an unknown `tasks` key, which
+# would create the project with an empty plan and no error, so the skill sends
+# the spelling every server reads until step B flips it with the version floor
+# (https://linear.app/starfoundry/issue/TYDEV-1232). --todo and ref type
+# todo: are still accepted, and absent from the help on purpose.
 #
 # Create-only: there is no upsert or dedupe, so running this twice makes two
 # projects.
@@ -859,7 +892,12 @@ projects_create() {
       --waiting-on) require_flag_arg "--waiting-on" $#; waiting_on=$2; shift 2 ;;
       --notes) require_flag_arg "--notes" $#; notes=$2; shift 2 ;;
       --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
+      --task)
+        require_flag_arg "--task" $#
+        todos_json=$(jq -c --arg title "$2" '. + [{title: $title}]' <<<"$todos_json")
+        shift 2 ;;
       --todo)
+        # Hidden alias of --task, kept for agents that learned it (TYDEV-1257).
         require_flag_arg "--todo" $#
         todos_json=$(jq -c --arg title "$2" '. + [{title: $title}]' <<<"$todos_json")
         shift 2 ;;
@@ -877,14 +915,14 @@ projects_create() {
           exit 1
         fi
         case "$ref_type" in
-          topic|todo|project|doc)
-            refs_json=$(jq -c --arg tt "$ref_type" --arg id "$ref_value" \
+          topic|task|todo|project|doc)
+            refs_json=$(jq -c --arg tt "$(wire_target_type "$ref_type")" --arg id "$ref_value" \
               '. + [{targetType: $tt, targetId: $id}]' <<<"$refs_json") ;;
           url)
             refs_json=$(jq -c --arg url "$ref_value" \
               '. + [{targetType: "url", url: $url}]' <<<"$refs_json") ;;
           *)
-            echo "Error: unknown --ref type '$ref_type'. Accepted: topic, todo, project, doc, url" >&2
+            echo "Error: unknown --ref type '$ref_type'. Accepted: topic, task, project, doc, url" >&2
             exit 1 ;;
         esac
         shift 2 ;;
@@ -917,10 +955,55 @@ projects_create() {
       echo "Error: file not found: $from_json" >&2
       exit 1
     fi
+    # The file has to BE a JSON object before anything below means anything, and
+    # that is checked first, loudly. It used to be folded into the conflict
+    # expression below as `(type == "object") and …`, which jq short-circuits:
+    # a file holding an array, a string or unparseable bytes evaluated to
+    # `false`, the conflict guard was SKIPPED rather than triggered, and the
+    # merge two steps down then failed with a jq error naming neither the file
+    # nor the reason. A guard whose input is wrong must fail, not pass.
+    local from_json_type
+    if ! from_json_type=$(jq -n --slurpfile extra "$from_json" '$extra[0] | type' 2>/dev/null); then
+      echo "Error: --from-json file is not valid JSON: $from_json" >&2
+      exit 1
+    fi
+    if [[ "$from_json_type" != '"object"' ]]; then
+      echo "Error: --from-json file must hold a JSON object (got ${from_json_type//\"/}): $from_json" >&2
+      exit 1
+    fi
+    # A file that carries BOTH `tasks` and `todos` is settled here, before any
+    # request, because the server's answer depends on its version: before 2.9.0
+    # it strips `tasks` and silently uses `todos`, from 2.9.0 it 400s when they
+    # differ. So both-but-different fails now, with the server's own message,
+    # and both-and-equal (jq `==`, so key order does not matter) sends `todos`.
+    #
+    # Assigned and status-tested on separate statements: `local x=$(...)` would
+    # make `local` the command whose status `set -e` sees, masking a jq failure
+    # and leaving the guard to compare an empty string.
+    local tasks_todos_conflict
+    if ! tasks_todos_conflict=$(jq -n --slurpfile extra "$from_json" '
+      $extra[0] | has("tasks") and has("todos") and (.tasks != .todos)'); then
+      echo "Error: could not read --from-json file: $from_json" >&2
+      exit 1
+    fi
+    if [[ "$tasks_todos_conflict" == "true" ]]; then
+      echo 'Error: --from-json file carries both `tasks` and `todos` with different values. `tasks` and `todos` are the same field; send one, or send both with identical values.' >&2
+      exit 1
+    fi
     # The file wins: `*` merges objects recursively and REPLACES arrays, so a
-    # file that carries todos/refs supersedes the flag-built ones outright
-    # rather than appending to them.
-    data=$(printf '%s' "$data" | jq --slurpfile extra "$from_json" '. * $extra[0]')
+    # file that carries tasks/refs supersedes the flag-built ones outright
+    # rather than appending to them. The file is spoken in the task spelling
+    # like the flags, and translated to the wire spelling the same way (D6): a
+    # `tasks` key becomes `todos` (replacing an equal `todos`, the only kind
+    # left after the check above), and a ref's targetType "task" becomes "todo".
+    data=$(printf '%s' "$data" | jq --slurpfile extra "$from_json" '
+      . * ($extra[0]
+        | if has("tasks")
+          then .todos = .tasks | del(.tasks) else . end
+        | if (.refs | type) == "array"
+          then .refs |= map(if (type == "object") and .targetType == "task"
+            then .targetType = "todo" else . end)
+          else . end)')
   fi
 
   api_request POST /projects "$data"
@@ -1013,6 +1096,8 @@ projects_refs_add() {
   done
 
   require_value "--target-type" "$target_type"
+  # task -> todo on the wire until step B (TYDEV-1257, D6; see wire_target_type).
+  target_type=$(wire_target_type "$target_type")
 
   local data
   data=$(jq -n \
@@ -1295,6 +1380,8 @@ areas_refs_add() {
   done
 
   require_value "--target-type" "$target_type"
+  # task -> todo on the wire until step B (TYDEV-1257, D6; see wire_target_type).
+  target_type=$(wire_target_type "$target_type")
 
   local data
   data=$(jq -n \
@@ -1754,9 +1841,11 @@ resolve_document_id() {
 # authenticated (anyone signed into TeamYou). Default is public - it is what
 # "share this" means to the person asking, and the alternative is narrower.
 #
-# Requires the share scope, which is never granted by default: a 403 here
-# means the key's owner has not ticked that box in Settings, not that the command
-# is wrong. Say so rather than retrying.
+# Requires the share scope AND the account-wide "Block agent sharing" switch
+# being off. A 403 here means one of those two is missing, not that the command
+# is wrong - the body says which: insufficient_scope is a box on the key,
+# AI_SHARE_DISABLED is one switch in Settings that covers every agent. Say which
+# one rather than retrying.
 #
 # Prints the document URL and the raw-markdown URL. Hand the raw one to another
 # agent; hand the other one to a person.
@@ -1823,8 +1912,9 @@ drive_restore() {
 # the address has a TeamYou account they get access now; if not, an invite is
 # stored and binds when they sign up with that verified address. The reply is the
 # same {shared:true} either way ON PURPOSE - this is never a way to check whether
-# an address has an account. Requires the share scope (a 403 means the key's
-# owner has not ticked that box in Settings). Undo with 'agent-drive ungrant'.
+# an address has an account. Requires the share scope AND the account-wide "Block
+# agent sharing" switch being off; a 403 names which of the two is missing. Undo
+# with 'agent-drive ungrant'.
 #
 # Accepts a path OR an id for the same reason share does: it is reached for right
 # after writing a document by path.
@@ -2166,23 +2256,23 @@ Usage: teamyou.sh ty projects <action> [arguments]
 
 Actions:
   list [--status active|waiting|done|archived] [--limit N]
-  create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--todo <title>]... [--ref <type>:<value>]... [--from-json <file>]
+  create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--task <title>]... [--ref <type>:<value>]... [--from-json <file>]
   get <project_id>
   update <project_id> [--name <text>] [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--no-goal] [--no-waiting-on] [--no-notes] [--no-due-date]
   delete <project_id>
-  refs-add <project_id> --target-type topic|todo|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
+  refs-add <project_id> --target-type topic|task|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
   doc-push <project_id> <file> [--path <path>] [--title <text>] [--ref-title <text>] [--after <ref_id>] [--before <ref_id>]
   refs-reorder <project_id> <ref_id> [--after <ref_id>] [--before <ref_id>]
   refs-remove <project_id> <ref_id>
 
 Notes:
-  create --todo/--ref/--from-json build the project and its children in ONE
+  create --task/--ref/--from-json build the project and its children in ONE
   atomic call: flag order is the order, and a failure anywhere creates nothing.
   It is create-only - there is no upsert or dedupe, so running it twice makes
-  two projects. --ref takes <type>:<value> (topic|todo|project|doc:<id>, or
-  url:<url>) and cannot point at a --todo from the same call (no id yet).
+  two projects. --ref takes <type>:<value> (topic|task|project|doc:<id>, or
+  url:<url>) and cannot point at a --task from the same call (no id yet).
   --from-json <file> is client-side only: the file is merged OVER the flags
-  and posted as the same JSON body, so it can set per-todo status/priority/
+  and posted as the same JSON body, so it can set per-task status/priority/
   dueDate/topicId that have no flag.
 
   doc-push document paths are GLOBAL per user, not per project: re-pushing a
@@ -2206,7 +2296,7 @@ Actions:
   get <area_id> [--depth direct|full]
   update <area_id> [--name <text>] [--description <text>] [--no-description] [--archived] [--no-archived]
   delete <area_id>
-  refs-add <area_id> --target-type topic|todo|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
+  refs-add <area_id> --target-type topic|task|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
   refs-reorder <area_id> <ref_id> [--after <ref_id>] [--before <ref_id>]
   refs-remove <area_id> <ref_id>
 EOF

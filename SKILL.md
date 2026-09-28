@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, or to write, read, or share a document on the agent drive.
 metadata:
-  version: '3.5.0'
+  version: '3.6.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -135,7 +135,7 @@ TOPIC_ID=$("$TY_DIR/scripts/teamyou.sh" ty graph topics-create "Italian Cooking"
 # Work: a task, and a project with its ordered plan and references in ONE call
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Buy groceries" --priority high --due-date "2026-02-01T00:00:00Z"
 "$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin expansion" --goal "Permits filed" \
-  --todo "Call the county about setbacks" --todo "Get three framing quotes" \
+  --task "Call the county about setbacks" --task "Get three framing quotes" \
   --ref url:https://example.com/permit-checklist
 
 # Documents: write a markdown file to TY Agent Drive (private), and search it
@@ -169,21 +169,34 @@ The three signals side by side, the ack rules and the registration gate:
 ## MCP
 
 The same operations are also served over the Model Context Protocol at
-`https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers:
-authenticate with the same `Authorization: Bearer ty_<key>` you use here (OAuth comes
-later). Each tool is named for one service at one permission level - `graph_read` /
-`graph_write`, `tasks_read` / `tasks_write`, `agent_drive_read` / `agent_drive_write` /
-`agent_drive_sharing` - and takes a required `action` argument whose values are the same
-verbs this helper uses. The one exception to that naming is `search` (actions `search` and
-`related`, the same calls as `ty search` and `ty search related`): one ranked list across
-every type, and the items one hop from one item, needing only `read`; use it before acting
-on a vague question about what the user already has. A small default set is
-advertised; `?tools=extended` on the server URL puts the full API behind it, adding the
-remaining services and replacing the tools
-whose action set grows with `_all` twins, so a tool name always identifies one action set.
+`https://www.teamyou.com/mcp` (streamable HTTP). Same nouns, same scopes, same handlers.
+Authentication follows the client: OAuth for the ones that speak it (Claude Code, Claude
+Desktop / claude.ai, Cursor, Codex, ChatGPT), and the same `Authorization: Bearer ty_<key>`
+you use here for header-only clients.
+A read-only server is at `https://www.teamyou.com/mcp/readonly`: only the reading tools are
+offered, a sign-in there asks for `read` alone, and a key presented there can change nothing
+whatever scopes it holds.
+Each tool is named for one pillar at one permission level - `knowledge_read` /
+`knowledge_write`, `work_read` / `work_write`, `agent_drive_read` / `agent_drive_write`,
+and `sharing` - and takes a required `action` argument. Inside a pillar the actions carry
+the noun where two services share a verb (`tasks-list`, `projects-list`, `areas-list`;
+`document-visibility`, `document-grant`). The one exception to that naming is `search`
+(actions `search` and `related`, the same calls as `ty search` and `ty search related`):
+one ranked list across every type, and the items one hop from one item, needing only
+`read` - so a read-only connector gets it too. Use it before acting on a vague question
+about what the user already has. The default set is those eight: every knowledge, work and
+Agent Drive operation, plus `search`.
+`?tools=extended` on the server URL adds the Team pillar (`team_read` / `team_write`: agent
+identity and preferences, instructions, routines, state), making ten. A tool name always
+identifies one action set.
 The tool catalogue is generated from the same OpenAPI contract as the reference files
 below, so a tool never describes an operation differently from `GET /openapi.json`. Use MCP
 when your client speaks it natively; use this helper when you have a shell.
+
+Setting it up is a HUMAN step, so hand your human the install page rather than trying to
+edit their client's config yourself: `https://www.teamyou.com/mcp/install` says which
+clients use which, and carries the per-client configuration, a one-line installer for
+macOS/Linux and Windows, and the key page.
 
 ## Rate limits and the raw API
 

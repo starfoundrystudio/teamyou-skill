@@ -1,7 +1,7 @@
 # Commands: `ty areas`
 
 An area is a container: a cross-pillar context that groups knowledge and work (topics,
-todos, projects, documents, urls) and can nest inside another area. Filing a topic means
+tasks, projects, documents, urls) and can nest inside another area. Filing a topic means
 adding it to an area; the topic's name stays plain.
 
 ## Contents
@@ -36,7 +36,7 @@ teamyou.sh ty areas create <name> [--description <text>] [--archived]
 teamyou.sh ty areas get <area_id> [--depth direct|full]
 teamyou.sh ty areas update <area_id> [--name <text>] [--description <text>] [--no-description] [--archived] [--no-archived]
 teamyou.sh ty areas delete <area_id>
-teamyou.sh ty areas refs-add <area_id> --target-type topic|todo|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
+teamyou.sh ty areas refs-add <area_id> --target-type topic|task|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
 teamyou.sh ty areas refs-reorder <area_id> <ref_id> [--after <ref_id>] [--before <ref_id>]
 teamyou.sh ty areas refs-remove <area_id> <ref_id>
 ```
@@ -50,9 +50,9 @@ teamyou.sh ty areas list | jq -r '.areas[] | "\(.id)\t\(.name)"'
 # File a topic
 teamyou.sh ty areas refs-add AREA_ID --target-type topic --target-id TOPIC_ID
 
-# A project, a todo, a document, a titled url
+# A project, a task, a document, a titled url
 teamyou.sh ty areas refs-add AREA_ID --target-type project --target-id PROJECT_ID
-teamyou.sh ty areas refs-add AREA_ID --target-type todo --target-id TODO_ID
+teamyou.sh ty areas refs-add AREA_ID --target-type task --target-id TASK_ID
 teamyou.sh ty areas refs-add AREA_ID --target-type doc --target-id DOC_ID
 teamyou.sh ty areas refs-add AREA_ID --target-type url --url https://example.com/handbook --title "Handbook"
 

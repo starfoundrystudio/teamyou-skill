@@ -28,8 +28,9 @@ Notes:
 
 - `list` returns up to `--limit` tasks, default 100, maximum 100 (a larger value is a 400).
   Archived tasks are excluded unless you pass `--archived`, which lists archived tasks
-  instead. Responses are `{ todos: [Task] }`; every other action returns `{ todo: Task }`
-  (deletes return `{ success: true }`).
+  instead. Responses are `{ tasks: [Task] }`; every other action returns `{ task: Task }`
+  (deletes return `{ success: true }`). Read those keys: the same value also rides under a
+  deprecated older key for clients that predate them.
 - `--due-date` is a date-time instant (ISO 8601). A project's `dueDate` is a calendar day
   (`YYYY-MM-DD`); the two are different shapes.
 - A task on a project plan keeps its plan position when completed; a project's

@@ -152,9 +152,9 @@ Deletes the area and cascades the references it holds (its members and sub-area 
 POST /areas/{id}/refs
 ```
 
-Links an area to a topic/todo/project/doc/url, or nests a sub-area with targetType=area (`within`). Re-adding an existing target returns 409 conflict. A nest that would close a cycle (or a self-loop) returns 409 cycle_detected — never a 500.
+Links an area to a topic/task/project/doc/url, or nests a sub-area with targetType=area (`within`). Re-adding an existing target returns 409 conflict. A nest that would close a cycle (or a self-loop) returns 409 cycle_detected — never a 500.
 
-**Skill CLI:** `teamyou.sh ty areas refs-add <area_id> --target-type topic|todo|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]`
+**Skill CLI:** `teamyou.sh ty areas refs-add <area_id> --target-type topic|task|project|area|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]`
 
 **Parameters:**
 
@@ -164,7 +164,7 @@ Links an area to a topic/todo/project/doc/url, or nests a sub-area with targetTy
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `target` | object \| object | yes | The reference target. `url` targets carry a url; all others carry a targetId. Accepted targetType: topic\|todo\|project\|area\|doc\|url. An `area` target is `within` nesting — routed through the cycle guard; a nest that would close a cycle returns 409. |
+| `target` | object \| object | yes | The reference target. `url` targets carry a url; all others carry a targetId. Accepted targetType: topic\|task\|project\|area\|doc\|url. An `area` target is `within` nesting — routed through the cycle guard; a nest that would close a cycle returns 409. |
 | `position` | RefPosition | no | Where in the ref list to place it; omit to append. Not applicable to an `area` nest (appended). |
 
 **Responses:**

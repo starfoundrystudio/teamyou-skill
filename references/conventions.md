@@ -234,8 +234,8 @@ URL, and here are my notes" becomes one create call, then a document push.
 # 1. One call: project + ordered plan + references (all-or-nothing)
 PROJECT_ID=$("$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin permit" \
   --goal "Permit filed" \
-  --todo "Call the county about setbacks" \
-  --todo "Get three framing quotes" \
+  --task "Call the county about setbacks" \
+  --task "Get three framing quotes" \
   --ref url:https://example.com/permit-checklist | jq -r '.project.id')
 
 # 2. Pasted markdown notes: write the document and link it in one step
