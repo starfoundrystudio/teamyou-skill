@@ -6,11 +6,28 @@ their behalf. The API key remains the only auth boundary; the record never grant
 ```text
 teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|other] [--name <display name>] [--model <model>]
 teamyou.sh ty agent whoami
+teamyou.sh ty agent list
 teamyou.sh ty agent ack <token>
 ```
 
+`ty agent list` is the peer roster: every agent on this account, with its `id`, `slug`,
+`name`, `kind`, `status`, `isPrimary`, `isYou` and `lastSeenAt`. Address a handoff
+(`ty checkin send --to`) with an `id` or `slug` from it. Keys and permissions are not
+included.
+
 Environment: `TEAMYOU_AGENT_SLUG` is the default `--slug`; `TEAMYOU_OPENCLAW_INSTANCE_ID`
 selects the provisioned OpenClaw mode.
+
+## Contents
+
+- [One durable identity per distinct instance](#one-durable-identity-per-distinct-instance)
+- [Pick your slug (the stable natural key)](#pick-your-slug-the-stable-natural-key)
+- [kind and displayName](#kind-and-displayname)
+- [Richer identity (optional, display-only)](#richer-identity-optional-display-only)
+- [Status, and the self-healing gate](#status-and-the-self-healing-gate)
+- [ack](#ack)
+- [First session](#first-session)
+- [Examples](#examples)
 
 ## One durable identity per distinct instance
 
@@ -72,6 +89,33 @@ dropped to a non-fatal `warnings[]` entry; registration still succeeds.
 the `ack_command` the nudge carries, then re-run the original command. Each ack is logged
 and visible to the owner; never loop it. The full rule set is in the updates reference
 linked from `SKILL.md`.
+
+## First session
+
+Your first check-in on an unregistered key returns a `system` item telling you to
+register; that item is the trigger for this section, and this is what to do after the
+`ty agent register` call succeeds.
+
+If `ty agent whoami` returns `null`, this is your first session: register with a stable
+slug (above). Then, only if the account is empty (no projects and at most one topic),
+onboard the human:
+
+1. Confirm registration worked (`ty agent whoami` now returns your agent).
+2. Tell the human, in two sentences: TeamYou is the shared workspace they review on the
+   web and phone; you write knowledge, projects and documents into it, and they steer you
+   there.
+3. Ask for ONE thing they are working on right now. Create it as a project (at most 5
+   steps, in order; goal optional) and at most 3 topics for the people or things it
+   mentions. Never more.
+4. Say: "It's on your TeamYou Home. Want to go wider? Ramble to me — work, life, projects,
+   things to remember — and I'll organise it."
+
+Shared by a team (several humans talk to you)? Create one project for the team and one
+topic per member instead of step 3. Keep onboarding documents private; never share them.
+
+A registered agent on an account that already has projects or topics skips all of this.
+Every later session starts with the check-in and the task at hand, not with a sweep of
+the workspace.
 
 ## Examples
 

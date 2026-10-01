@@ -101,7 +101,7 @@ In conversation that looks like:
 - **Search** — semantic search across topics and details
 - **Tasks, projects, areas** — the work surface the human reviews
 - **TY Agent Drive** — document and file storage for agents (markdown today), with
-  per-document sharing
+per-document sharing
 
 Full command reference: [SKILL.md](SKILL.md) for the body and conventions,
 [references/](references/) for per-noun command pages and the generated per-domain API
@@ -120,10 +120,10 @@ validated artifact, extracted and committed. Releases are tagged `vX.Y.Z`, match
 
 `skill-release.json` at the root records what a tag contains:
 
-| Field | Meaning |
-| --- | --- |
-| `version` | the released SemVer, same as the tag |
-| `git_commit` | the source commit in the TeamYou monorepo the payload was built from |
+| Field            | Meaning                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `version`        | the released SemVer, same as the tag                                                                                                 |
+| `git_commit`     | the source commit in the TeamYou monorepo the payload was built from                                                                 |
 | `payload_sha256` | a content fingerprint of the payload: the SHA-256 of the sorted `<sha256>  <path>` index of every file, the manifest itself excluded |
 
 `payload_sha256` is the same value in the published archive and at this tag for a given

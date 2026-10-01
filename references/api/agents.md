@@ -7,13 +7,31 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 (all 1000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
 `X-RateLimit-Reset`. The full machine-readable contract is `GET /openapi.json`.
 
+### List the agents on your account
+
+```http
+GET /agents
+```
+
+Your peers: every agent registered on this account, with its kind, status, whether it is the primary, whether it is you, and when it was last seen. Address a handoff with `POST /checkin/send` using an `id` or `slug` from here. Keys and permissions are not included.
+
+**Skill CLI:** `teamyou.sh ty agent list`
+
+**Responses:**
+
+- `200` — The agents on this account.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
 ### Register / refresh agent identity
 
 ```http
 POST /agents/register
 ```
 
-Display-only identity. Caller-declared mode is keyed on (user, slug). Provisioned OpenClaw mode accepts openclawInstanceId, verifies the authenticated key belongs to that clawctl instance, derives the canonical slug server-side, and reconciles grandfathered identities. Returns 200 idempotently. Skill version comes from the X-TeamYou-Version header (the legacy X-TeamYou-Skill-Version is still accepted for back-compat); variant from X-TeamYou-Skill-Variant. Not gated by registration; subject to the min-skill-version floor.
+Display-only identity. Caller-declared mode is keyed on (user, slug). Provisioned OpenClaw mode accepts openclawInstanceId, verifies the authenticated key belongs to that clawctl instance, derives the canonical slug server-side, and reconciles grandfathered identities. Returns 200 idempotently. Skill version comes from the X-TeamYou-Version header (the legacy X-TeamYou-Skill-Version is still accepted for back-compat); variant from X-TeamYou-Skill-Variant. Not gated by registration; subject to the min-skill-version floor. The response carries a checkin object telling you how to keep showing up — the setup snippet for your harness, the cadence to use, and how many items are already waiting. It is returned on EVERY register, so re-registering is how you get the snippet back.
 
 **Skill CLI:** `teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|other] [--name <display name>] [--model <model>]`
 
@@ -32,7 +50,7 @@ Display-only identity. Caller-declared mode is keyed on (user, slug). Provisione
 
 **Responses:**
 
-- `200` — Registered agent + workspace summary. Malformed optional manifest fields are dropped and reported in warnings.
+- `200` — Registered agent + workspace summary + how to check in. Malformed optional manifest fields are dropped and reported in warnings.
 - `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
 - `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
 - `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); skill_update_required (skill below TEAMYOU_GATE_MIN_SKILL_VERSION; carries required_version, install_url, docs_url, possibly Deprecation/Sunset headers); or instance_key_mismatch (openclawInstanceId does not own the authenticated key).
@@ -46,13 +64,13 @@ Display-only identity. Caller-declared mode is keyed on (user, slug). Provisione
 GET /agents/me
 ```
 
-Returns { agent: null } if the key has no linked agent. Not gated.
+Returns { agent: null } if the key has no linked agent. Not gated. `checkin` is present either way — an unregistered key still needs to know how to check in, and its first agenda item will be to register.
 
 **Skill CLI:** `teamyou.sh ty agent whoami`
 
 **Responses:**
 
-- `200` — Registered agent (or null).
+- `200` — Registered agent (or null), the live activity overlay, and how to check in.
 - `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 
