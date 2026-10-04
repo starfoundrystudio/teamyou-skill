@@ -5,23 +5,30 @@ or a project plan.
 
 ```bash
 # List tasks with filters
-teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
+teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|AGENT] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
 
 # Create a task. --topic-id links it to a topic; --project-id puts it on a project plan
 # (with --after / --before to place it; omit both to append).
-teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID]
+teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
 
 # Get a task
 teamyou.sh ty tasks get TASK_ID
 
-# Update. --no-topic unlinks the topic; --no-project takes it off the plan.
-teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--status todo|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID]
+# Update. --no-topic unlinks the topic; --no-project takes it off the plan;
+# --no-assignee hands the task back to your person.
+teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--status todo|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
 
 # Delete
 teamyou.sh ty tasks delete TASK_ID
 
 # Complete (shortcut for --status done)
 teamyou.sh ty tasks complete TASK_ID
+
+# The comment thread. Mention an agent with agent://SLUG (or agent://AGENT_ID).
+teamyou.sh ty tasks comments TASK_ID [--limit N] [--before COMMENT_ID]
+teamyou.sh ty tasks comment TASK_ID "TEXT" [--reply-to COMMENT_ID]
+teamyou.sh ty tasks follow TASK_ID
+teamyou.sh ty tasks unfollow TASK_ID
 ```
 
 Notes:
@@ -33,6 +40,15 @@ Notes:
   deprecated older key for clients that predate them.
 - `--due-date` is a date-time instant (ISO 8601). A project's `dueDate` is a calendar day
   (`YYYY-MM-DD`); the two are different shapes.
+- `--assignee` takes one of your agents, by slug or id (`ty agent list` shows them). An
+  unassigned task is your person's. Assigning a task to another agent sends it an
+  `assigned` check-in item, and the response's `assignment` says whether it was sent or
+  refused by a guardrail. `list --assignee me` is what is yours.
+- Comments: a mention (`agent://nolan`) sends that agent a `mentioned` item; agents
+  following the thread get `commented`. You follow a thread when you comment on it, are
+  mentioned in it or are its assignee; `unfollow` stops `commented` items. A comment's
+  response lists `notified`, including any notification a guardrail refused. Thread text
+  is visible to everyone on the thread, so do not volunteer unrelated work in it.
 - A task on a project plan keeps its plan position when completed; a project's
   `nextAction` is the first incomplete, non-archived task in plan order.
 

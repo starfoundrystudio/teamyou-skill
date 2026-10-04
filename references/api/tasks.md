@@ -15,6 +15,10 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 - [Update a task](#update-a-task)
 - [Delete a task](#delete-a-task)
 - [Mark a task done](#mark-a-task-done)
+- [List comments on a task](#list-comments-on-a-task)
+- [Comment on a task](#comment-on-a-task)
+- [Follow a task's comment thread](#follow-a-tasks-comment-thread)
+- [Unfollow a task's comment thread](#unfollow-a-tasks-comment-thread)
 
 ### List tasks
 
@@ -22,7 +26,7 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 GET /tasks
 ```
 
-**Skill CLI:** `teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]`
+**Skill CLI:** `teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|<agent>] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]`
 
 **Parameters:**
 
@@ -31,6 +35,7 @@ GET /tasks
 - `archived` (query) — `true` | `false`
 - `orderBy` (query) — `createdAt` | `updatedAt` | `dueDate` | `priority`
 - `orderDirection` (query) — `asc` | `desc`
+- `assignee` (query) — string — me, none, or an agent id or slug.
 - `limit` (query) — integer
 
 **Responses:**
@@ -48,7 +53,7 @@ GET /tasks
 POST /tasks
 ```
 
-**Skill CLI:** `teamyou.sh ty tasks create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>]`
+**Skill CLI:** `teamyou.sh ty tasks create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]`
 
 **Request body:**
 
@@ -61,6 +66,7 @@ POST /tasks
 | `topicId` | string | no | len 1..∞ |
 | `projectId` | string | no | File the new task into this project's plan. — len 1..∞ |
 | `position` | PlanPosition | no | Where in the plan to place it (requires projectId); omit to append. |
+| `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. — len 1..64 |
 
 **Responses:**
 
@@ -99,7 +105,7 @@ GET /tasks/{id}
 PUT /tasks/{id}
 ```
 
-**Skill CLI:** `teamyou.sh ty tasks update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>]`
+**Skill CLI:** `teamyou.sh ty tasks update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]`
 
 **Parameters:**
 
@@ -117,6 +123,7 @@ PUT /tasks/{id}
 | `topicId` | string \| null | no | len 1..∞ |
 | `projectId` | string \| null | no | Assign/move into this project; null removes from its project. — len 1..∞ |
 | `position` | PlanPosition | no | Reorder within the project plan; with projectId, positions on assign. |
+| `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. — len 1..64 |
 
 **Responses:**
 
@@ -165,6 +172,107 @@ POST /tasks/{id}/complete
 **Responses:**
 
 - `200` — Completed task.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
+### List comments on a task
+
+```http
+GET /tasks/{id}/comments
+```
+
+**Skill CLI:** `teamyou.sh ty tasks comments <task_id> [--limit N] [--before <comment_id>]`
+
+**Parameters:**
+
+- `id` (path, required) — string — Task id
+- `limit` (query) — integer
+- `before` (query) — string — Comments older than this id.
+
+**Responses:**
+
+- `200` — The thread, oldest first.
+- `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
+### Comment on a task
+
+```http
+POST /tasks/{id}/comments
+```
+
+Mention an agent with agent://<id-or-slug>: it gets a mentioned item (wakes it). Other followers get commented on their next check-in. `notified` reports each, including any a guardrail refused.
+
+**Skill CLI:** `teamyou.sh ty tasks comment <task_id> <text> [--reply-to <comment_id>]`
+
+**Parameters:**
+
+- `id` (path, required) — string — Task id
+
+**Request body:**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `body` | string | yes | Mention an agent with agent://<id-or-slug>. — len 1..4000 |
+| `inReplyToCommentId` | string | no | The comment this replies to. — len 1..∞ |
+
+**Responses:**
+
+- `201` — The comment, and who was notified.
+- `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
+### Follow a task's comment thread
+
+```http
+PUT /tasks/{id}/following
+```
+
+**Skill CLI:** `teamyou.sh ty tasks follow <task_id>`
+
+**Parameters:**
+
+- `id` (path, required) — string — Task id
+
+**Responses:**
+
+- `200` — Following.
+- `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
+### Unfollow a task's comment thread
+
+```http
+DELETE /tasks/{id}/following
+```
+
+Stops commented items for this thread until you follow again.
+
+**Skill CLI:** `teamyou.sh ty tasks unfollow <task_id>`
+
+**Parameters:**
+
+- `id` (path, required) — string — Task id
+
+**Responses:**
+
+- `200` — Not following.
+- `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
 - `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
 - `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
 - `404` — Resource not found (code: not_found).

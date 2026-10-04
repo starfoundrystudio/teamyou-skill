@@ -29,9 +29,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.7.0"
+SKILL_VERSION="3.8.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_sZ3FEtdlHay3"
+SKILL_VERSION_GUID="vg_LQImbLUCAwOx"
 
 # Get API key from environment or ~/.teamyou_key
 get_api_key() {
@@ -648,6 +648,7 @@ tasks_list() {
       --status) require_flag_arg "--status" $#; params="${params}&status=$2"; shift 2 ;;
       --archived) params="${params}&archived=true"; shift ;;
       --priority) require_flag_arg "--priority" $#; params="${params}&priority=$2"; shift 2 ;;
+      --assignee) require_flag_arg "--assignee" $#; params="${params}&assignee=$(url_encode "$2")"; shift 2 ;;
       --order-by) require_flag_arg "--order-by" $#; params="${params}&orderBy=$2"; shift 2 ;;
       --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -667,11 +668,12 @@ tasks_create() {
   shift || true
   require_value "title" "$title"
 
-  local description="" status="" priority="" due_date="" topic_id="" project_id="" after="" before=""
+  local description="" status="" priority="" due_date="" topic_id="" project_id="" after="" before="" assignee=""
 
   while [[ $# -gt 0 ]]; do
     case $1 in
       --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
+      --assignee) require_flag_arg "--assignee" $#; assignee=$2; shift 2 ;;
       --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
       --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
       --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
@@ -708,6 +710,7 @@ tasks_create() {
     --arg project "$project_id" \
     --arg after "$after" \
     --arg before "$before" \
+    --arg assignee "$assignee" \
     '{title: $title}
     | if $desc != "" then . + {description: $desc} else . end
     | if $status != "" then . + {status: $status} else . end
@@ -715,6 +718,7 @@ tasks_create() {
     | if $due != "" then . + {dueDate: $due} else . end
     | if $topic != "" then . + {topicId: $topic} else . end
     | if $project != "" then . + {projectId: $project} else . end
+    | if $assignee != "" then . + {assigneeAgentId: $assignee} else . end
     | if ($after != "" or $before != "") then . + {position: (
         {}
         | if $after != "" then . + {after: $after} else . end
@@ -736,7 +740,7 @@ tasks_update() {
   require_value "task_id" "$task_id"
 
   local title="" description="" status="" priority="" due_date="" archived="" topic_id="" clear_topic=""
-  local project_id="" clear_project="" after="" before=""
+  local project_id="" clear_project="" after="" before="" assignee="" clear_assignee=""
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -764,6 +768,8 @@ tasks_update() {
         shift 2
         ;;
       --no-project) clear_project="true"; shift ;;
+      --assignee) require_flag_arg "--assignee" $#; assignee=$2; shift 2 ;;
+      --no-assignee) clear_assignee="true"; shift ;;
       --after) require_flag_arg "--after" $#; after=$2; shift 2 ;;
       --before) require_flag_arg "--before" $#; before=$2; shift 2 ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -784,6 +790,8 @@ tasks_update() {
     --arg clearProject "$clear_project" \
     --arg after "$after" \
     --arg before "$before" \
+    --arg assignee "$assignee" \
+    --arg clearAssignee "$clear_assignee" \
     '{}
     | if $title != "" then . + {title: $title} else . end
     | if $desc != "" then . + {description: $desc} else . end
@@ -796,6 +804,9 @@ tasks_update() {
       else . end
     | if $project != "" then . + {projectId: $project}
       elif $clearProject == "true" then . + {projectId: null}
+      else . end
+    | if $assignee != "" then . + {assigneeAgentId: $assignee}
+      elif $clearAssignee == "true" then . + {assigneeAgentId: null}
       else . end
     | if ($after != "" or $before != "") then . + {position: (
         {}
@@ -818,6 +829,51 @@ tasks_complete() {
   api_request POST "/tasks/$task_id/complete"
 }
 
+# Comments on tasks and projects (check-in Phase 1b). $1 is the API noun
+# (tasks | projects). Mention an agent in the text with agent://<id-or-slug>.
+work_comments_list() {
+  local noun=$1 target_id=$2
+  shift 2 || true
+  require_value "${noun%s}_id" "$target_id"
+  local params=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
+      --before) require_flag_arg "--before" $#; params="${params}&before=$(url_encode "$2")"; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+  params="${params#&}"
+  if [[ -n "$params" ]]; then
+    params="?$params"
+  fi
+  api_request GET "/$noun/$target_id/comments$params"
+}
+
+work_comment_add() {
+  local noun=$1 target_id=$2 text=$3
+  shift 3 || true
+  require_value "${noun%s}_id" "$target_id"
+  require_value "text" "$text"
+  local reply_to=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --reply-to) require_flag_arg "--reply-to" $#; reply_to=$2; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+  local data
+  data=$(jq -n --arg body "$text" --arg reply "$reply_to" \
+    '{body: $body} | if $reply != "" then . + {inReplyToCommentId: $reply} else . end')
+  api_request POST "/$noun/$target_id/comments" "$data"
+}
+
+work_follow() {
+  local noun=$1 method=$2 target_id=$3
+  require_value "${noun%s}_id" "$target_id"
+  api_request "$method" "/$noun/$target_id/following"
+}
+
 dispatch_ty_tasks() {
   ty_dispatch_begin "ty tasks" show_ty_tasks_help "$@" && return 0
   local action=$1
@@ -830,6 +886,10 @@ dispatch_ty_tasks() {
     update) tasks_update "$@" ;;
     delete) tasks_delete "$@" ;;
     complete) tasks_complete "$@" ;;
+    comments) work_comments_list tasks "$@" ;;
+    comment) work_comment_add tasks "$@" ;;
+    follow) work_follow tasks PUT "$@" ;;
+    unfollow) work_follow tasks DELETE "$@" ;;
     -h|--help) show_ty_tasks_help ;;
     *) echo "Unknown ty tasks action: $action" >&2; echo "Run 'teamyou.sh ty tasks -h' for usage" >&2; exit 1 ;;
   esac
@@ -1245,6 +1305,10 @@ dispatch_ty_projects() {
     doc-push) projects_doc_push "$@" ;;
     refs-remove) projects_refs_remove "$@" ;;
     refs-reorder) projects_refs_reorder "$@" ;;
+    comments) work_comments_list projects "$@" ;;
+    comment) work_comment_add projects "$@" ;;
+    follow) work_follow projects PUT "$@" ;;
+    unfollow) work_follow projects DELETE "$@" ;;
     -h|--help) show_ty_projects_help ;;
     *) echo "Unknown ty projects action: $action" >&2; echo "Run 'teamyou.sh ty projects -h' for usage" >&2; exit 1 ;;
   esac
@@ -2542,12 +2606,16 @@ TeamYou Tasks (ty tasks)
 Usage: teamyou.sh ty tasks <action> [arguments]
 
 Actions:
-  list [--status todo|done] [--archived] [--priority high|medium|low|none] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
-  create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>]
+  list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|<agent>] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
+  create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]
   get <task_id>
-  update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>]
+  update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
   delete <task_id>
   complete <task_id>
+  comments <task_id> [--limit N] [--before <comment_id>]
+  comment <task_id> <text> [--reply-to <comment_id>]
+  follow <task_id>
+  unfollow <task_id>
 EOF
 }
 # GENERATED-FROM-OPENAPI:tasks:end
@@ -2565,6 +2633,10 @@ Actions:
   get <project_id>
   update <project_id> [--name <text>] [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--no-goal] [--no-waiting-on] [--no-notes] [--no-due-date]
   delete <project_id>
+  comments <project_id> [--limit N] [--before <comment_id>]
+  comment <project_id> <text> [--reply-to <comment_id>]
+  follow <project_id>
+  unfollow <project_id>
   refs-add <project_id> --target-type topic|task|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]
   doc-push <project_id> <file> [--path <path>] [--title <text>] [--ref-title <text>] [--after <ref_id>] [--before <ref_id>]
   refs-reorder <project_id> <ref_id> [--after <ref_id>] [--before <ref_id>]
