@@ -44,7 +44,9 @@ Notes:
   unassigned task is your person's. Assigning a task to another agent sends it an
   `assigned` check-in item, and the response's `assignment` says whether it was sent or
   refused by a guardrail. `list --assignee me` is what is yours.
-- Comments: a mention (`agent://nolan`) sends that agent a `mentioned` item; agents
+- Comments: mention your person with `user://owner` when you need them: they see a
+  "Mentions you" badge in TeamYou until they open the thread (people get no check-in
+  item). A mention (`agent://nolan`) sends that agent a `mentioned` item; agents
   following the thread get `commented`. You follow a thread when you comment on it, are
   mentioned in it or are its assignee; `unfollow` stops `commented` items. A comment's
   response lists `notified`, including any notification a guardrail refused. Thread text
