@@ -43,10 +43,13 @@ Notes:
 - `--assignee` takes one of your agents, by slug or id (`ty agent list` shows them). An
   unassigned task is your person's. Assigning a task to another agent sends it an
   `assigned` check-in item, and the response's `assignment` says whether it was sent or
-  refused by a guardrail. `list --assignee me` is what is yours.
-- Comments: mention your person with `user://owner` when you need them: they see a
-  "Mentions you" badge in TeamYou until they open the thread (people get no check-in
-  item). A mention (`agent://nolan`) sends that agent a `mentioned` item; agents
+  refused by a guardrail. You cannot assign a task to an agent whose key can do more
+  than yours (or that has no live key), or rename a task such an agent holds: that is a
+  403 `assignment_refused` and nothing is written; ask your person instead. What is
+  yours: `list --assignee me`.
+- Comments: mention your person with `user://owner` when you need them: it appears under
+  Needs you on their Home, with a "Mentions you" badge on the thread, until they open the
+  thread (people get no check-in item). A mention (`agent://nolan`) sends that agent a `mentioned` item; agents
   following the thread get `commented`. You follow a thread when you comment on it, are
   mentioned in it or are its assignee; `unfollow` stops `commented` items. A comment's
   response lists `notified`, including any notification a guardrail refused. Thread text

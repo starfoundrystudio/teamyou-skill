@@ -26,6 +26,10 @@ tasks, other projects, documents, urls). `projects get` is the one-call orientat
   update. Both project surfaces draw it in a narrow fixed-width slot and truncate the
   overflow, so a sentence written here is stored but never read. It is meaningful when the
   status is `waiting`, but not enforced against it: a project can carry it while active.
+- When the project is waiting on **your person**, write `user://owner` in `--waiting-on`
+  (for example `user://owner: approve the rollout plan`) and set `--status waiting`. They
+  then see it under Needs you on their Home, and it clears once the project is no longer
+  waiting on them. A plain name (`Bill`) is stored as text and notifies no one.
 - `dueDate` is a calendar day (`YYYY-MM-DD`), a soft target that drives no behaviour. A
   task's due date is a date-time instant; the shapes differ.
 - Every reference a read returns carries `display`, its human name resolved from the live

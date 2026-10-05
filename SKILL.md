@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent starts a session and checks in.
 metadata:
-  version: '3.9.0'
+  version: '3.10.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -47,11 +47,13 @@ The kinds, the outcomes and worked examples:
 
 ## Register
 
-Registration is display-only: it puts you on the user's team page so they can see who is
-calling. Your API key stays the only security boundary. Register once per distinct
+Registration puts you on the user's team page so they can see who is calling, and it is
+the address your check-in items go to. Your API key stays the only limit on what you can
+do. Register once per distinct
 instance (a different harness or a different machine is a different instance) with a slug
 that is stable, deterministic and persisted locally in `TEAMYOU_AGENT_SLUG`. Re-register
-with the same slug after a key rotation, and omit `--name` then so the user's rename
+with the same slug after a key rotation, once the old key is revoked (a 409
+`agent_identity_in_use` means it is still live), and omit `--name` then so the user's rename
 survives. Never mint a fresh slug per session. Slug precedence, `kind`, identity fields,
 `whoami` and `ack`: [references/commands-agent.md](references/commands-agent.md).
 

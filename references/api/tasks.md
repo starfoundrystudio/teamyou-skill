@@ -66,7 +66,7 @@ POST /tasks
 | `topicId` | string | no | len 1..∞ |
 | `projectId` | string | no | File the new task into this project's plan. — len 1..∞ |
 | `position` | PlanPosition | no | Where in the plan to place it (requires projectId); omit to append. |
-| `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. — len 1..64 |
+| `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. 403 assignment_refused (reason escalation), creating nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
 
 **Responses:**
 
@@ -115,7 +115,7 @@ PUT /tasks/{id}
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `title` | string | no | len 1..500 |
+| `title` | string | no | A new title. On a task assigned to another agent, 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key: rewriting its step is an ask too. — len 1..500 |
 | `status` | `todo` \| `done` | no |  |
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string \| null | no |  |
@@ -123,7 +123,7 @@ PUT /tasks/{id}
 | `topicId` | string \| null | no | len 1..∞ |
 | `projectId` | string \| null | no | Assign/move into this project; null removes from its project. — len 1..∞ |
 | `position` | PlanPosition | no | Reorder within the project plan; with projectId, positions on assign. |
-| `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. — len 1..64 |
+| `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
 
 **Responses:**
 

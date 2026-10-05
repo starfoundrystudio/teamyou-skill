@@ -38,7 +38,11 @@ distinct if they differ in **harness** (Claude Desktop, Codex, OpenClaw, Hermes,
 ## Pick your `slug` (the stable natural key)
 
 Re-registering with the same slug refreshes the same agent and re-attaches a rotated API
-key to it instead of creating a duplicate. Resolve it in order:
+key to it instead of creating a duplicate. A new key may only take over an identity that no
+other live key still holds: rotate by having the old key **revoked first** (Settings → API
+keys), then register with the new one. While the old key is live, registering returns 409
+`agent_identity_in_use`; tell your person to revoke it, then register again. Resolve the
+slug in order:
 
 1. **`TEAMYOU_AGENT_SLUG` is set** → use it. (Named or autonomous agents: the wakeup
    script or operator sets this, e.g. `hermes`; the helper reads it as the default.)
