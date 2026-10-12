@@ -4,7 +4,7 @@ Registration is a **display-only** record so the user can see and manage who is 
 their behalf. The API key remains the only auth boundary; the record never grants access.
 
 ```text
-teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|other] [--name <display name>] [--model <model>]
+teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|other] [--name <display name>] [--model <model>]
 teamyou.sh ty agent whoami
 teamyou.sh ty agent list
 teamyou.sh ty agent ack <token>
@@ -51,8 +51,13 @@ slug in order:
 
 Keep it stable, deterministic, anchored on whatever is durable for you (the name for
 migratable or cloud agents, the host for machine-pinned harnesses), and persisted
-machine-locally (`TEAMYOU_AGENT_SLUG` in the shell profile; the key in `~/.teamyou_key`),
-never in a shared or committed repo.
+in YOUR OWN configuration (`TEAMYOU_AGENT_SLUG` in your harness's environment settings, never a
+shell profile other agents on the machine share; the key in a secret store that passes it into
+your commands, or otherwise in your own `~/.teamyou/keys/<slug>.key`; a vault that only fills in
+browser forms does not count), never in a shared or committed repo. The
+helper finds your key file by your slug, and refuses rather than guesses when several agents keep
+keys on one machine and no slug is set. `ty auth status` shows which key you are using and which
+agent it belongs to.
 
 **Never:** a fresh slug per session (creates duplicates) · another instance's slug
 (conflates two agents) · one key shared across instances (it ping-pongs between agents).

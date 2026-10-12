@@ -59,12 +59,20 @@ git clone https://github.com/starfoundrystudio/teamyou-skill.git ~/.agents/skill
 Get an API key from your [TeamYou settings](https://teamyou.ai/settings), then either:
 
 ```bash
-# Option 1: environment variable
-export TEAMYOU_API_KEY="ty_your_api_key_here"
+# Preferred: a secret store or vault that passes the key into your commands
+# (one that only fills in browser forms cannot). Pass it to each command as
+# TEAMYOU_API_KEY; the helper reads this variable first.
+TEAMYOU_API_KEY="<from your secret store>" "$TY_DIR/scripts/teamyou.sh" ty checkin
 
-# Option 2: key file (recommended for long-lived agents)
-echo "ty_your_api_key_here" > ~/.teamyou_key
+# Otherwise: your own plaintext key file, named by your
+# slug and readable only by you (one file per agent on the machine)
+(umask 077 && mkdir -p ~/.teamyou/keys && printf '%s' "ty_your_api_key_here" > ~/.teamyou/keys/<your-slug>.key)
 ```
+
+Set `TEAMYOU_AGENT_SLUG` to your slug in your agent's own configuration (not a shell profile
+other agents share): the helper finds your key file by it. `ty auth status` shows which key is in
+use and which agent it belongs to. On Windows, follow the install instructions, which also lock
+the folder to your account.
 
 ## Usage
 

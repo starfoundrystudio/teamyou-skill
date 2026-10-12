@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent starts a session and checks in.
 metadata:
-  version: '3.10.0'
+  version: '3.11.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -29,8 +29,12 @@ TY_DIR="$(cd "$(dirname "$SKILL_MD")" && pwd)"
 "$TY_DIR/scripts/teamyou.sh" ty graph topics-list
 ```
 
-Requires `bash`, `curl` and `jq`. API key: `export TEAMYOU_API_KEY="ty_…"` or
-`echo "ty_…" > ~/.teamyou_key`.
+Requires `bash`, `curl` and `jq`. API key: a secret store or vault counts only if it passes the
+key into your commands; then pass it as `TEAMYOU_API_KEY` (read first). A vault that only fills in
+forms in a browser cannot authenticate these commands: don't use it or offer it for this key.
+Otherwise use your own owner-only file, `~/.teamyou/keys/<slug>.key`, found by
+`TEAMYOU_AGENT_SLUG`. Set the slug in your own config, not a shell profile other agents share.
+`ty auth status` shows which key you use, where it came from, and whose it is.
 
 ## Check in (do this first)
 

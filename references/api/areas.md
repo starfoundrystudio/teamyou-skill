@@ -195,8 +195,8 @@ PATCH /areas/{id}/refs/{refId}
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `after` | string | no | Place after this ref. — len 1..∞ |
-| `before` | string | no | Place before this ref. — len 1..∞ |
+| `after` | string | no | Place directly after this ref. — len 1..∞ |
+| `before` | string | no | Place directly before this ref. — len 1..∞ |
 
 **Responses:**
 

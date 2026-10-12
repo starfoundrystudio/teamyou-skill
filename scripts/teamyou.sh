@@ -29,19 +29,95 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.10.0"
+SKILL_VERSION="3.11.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_DO6POmv1z6kA"
+SKILL_VERSION_GUID="vg_fCKSWRdsnR1z"
 
-# Get API key from environment or ~/.teamyou_key
+# Where each agent's key file lives: one file per agent, named by its slug, so
+# two agents on one machine never read each other's key. A preview build
+# rewrites PREVIEW_KEY_FILE to that preview's own key file.
+TEAMYOU_KEYS_DIR="$HOME/.teamyou/keys"
+LEGACY_KEY_FILE="$HOME/.teamyou_key"
+PREVIEW_KEY_FILE=""
+
+# Decide where this agent's key comes from, without reading it. Sets
+# KEY_SOURCE (env | preview-file | agent-file | legacy-file) and KEY_PATH, or
+# prints why it cannot tell and returns 1. It never guesses between agents:
+#   1. TEAMYOU_API_KEY, set by a vault, a harness, or inline.
+#   2. On a preview build, that preview's key file.
+#   3. With TEAMYOU_AGENT_SLUG set: ~/.teamyou/keys/<slug>.key, else the legacy
+#      ~/.teamyou_key (installs from before per-agent files).
+#   4. With no slug: the one key file there is. Several (the legacy file
+#      counts) is a refusal, because picking one would act as another agent.
+resolve_key_location() {
+  KEY_SOURCE=""
+  KEY_PATH=""
+  if [[ -n "${TEAMYOU_API_KEY:-}" ]]; then
+    KEY_SOURCE="env"
+    return 0
+  fi
+  if [[ -n "$PREVIEW_KEY_FILE" ]]; then
+    if [[ -f "$PREVIEW_KEY_FILE" ]]; then
+      KEY_SOURCE="preview-file"
+      KEY_PATH="$PREVIEW_KEY_FILE"
+      return 0
+    fi
+    echo "Error: No API key for this preview. Set TEAMYOU_API_KEY or save the preview key to $PREVIEW_KEY_FILE" >&2
+    return 1
+  fi
+
+  local slug="${TEAMYOU_AGENT_SLUG:-}"
+  if [[ -n "$slug" ]]; then
+    # The server's slug rule has no "/", so this cannot leave the keys folder.
+    if [[ ! "$slug" =~ ^[A-Za-z0-9][A-Za-z0-9\ _.-]*$ ]]; then
+      echo "Error: TEAMYOU_AGENT_SLUG is not a valid slug: $slug" >&2
+      return 1
+    fi
+    if [[ -f "$TEAMYOU_KEYS_DIR/$slug.key" ]]; then
+      KEY_SOURCE="agent-file"
+      KEY_PATH="$TEAMYOU_KEYS_DIR/$slug.key"
+      return 0
+    fi
+    if [[ -f "$LEGACY_KEY_FILE" ]]; then
+      KEY_SOURCE="legacy-file"
+      KEY_PATH="$LEGACY_KEY_FILE"
+      return 0
+    fi
+    echo "Error: No API key for agent \"$slug\". Set TEAMYOU_API_KEY, or save the key to $TEAMYOU_KEYS_DIR/$slug.key" >&2
+    return 1
+  fi
+
+  local candidates=() f
+  [[ -f "$LEGACY_KEY_FILE" ]] && candidates+=("$LEGACY_KEY_FILE")
+  if [[ -d "$TEAMYOU_KEYS_DIR" ]]; then
+    for f in "$TEAMYOU_KEYS_DIR"/*.key; do
+      [[ -f "$f" ]] || continue
+      # Preview keys belong to preview builds, never to this one.
+      [[ "$(basename "$f")" == preview-* ]] && continue
+      candidates+=("$f")
+    done
+  fi
+  if [[ ${#candidates[@]} -eq 1 ]]; then
+    KEY_PATH="${candidates[0]}"
+    if [[ "$KEY_PATH" == "$LEGACY_KEY_FILE" ]]; then KEY_SOURCE="legacy-file"; else KEY_SOURCE="agent-file"; fi
+    return 0
+  fi
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    echo "Error: No API key found. Set TEAMYOU_API_KEY, or set TEAMYOU_AGENT_SLUG and save the key to $TEAMYOU_KEYS_DIR/<slug>.key" >&2
+    return 1
+  fi
+  echo "Error: Several agents keep keys on this machine, and TEAMYOU_AGENT_SLUG is not set, so this agent cannot tell which key is its own:" >&2
+  printf '  %s\n' "${candidates[@]}" >&2
+  echo "Set TEAMYOU_AGENT_SLUG to your slug in your own configuration (not a shell profile other agents share)." >&2
+  return 1
+}
+
 get_api_key() {
-  if [[ -n "$TEAMYOU_API_KEY" ]]; then
+  resolve_key_location || exit 1
+  if [[ "$KEY_SOURCE" == "env" ]]; then
     printf '%s' "$TEAMYOU_API_KEY"
-  elif [[ -f "$HOME/.teamyou_key" ]]; then
-    tr -d '\n\r' < "$HOME/.teamyou_key"
   else
-    echo "Error: No API key found. Set TEAMYOU_API_KEY env var or create ~/.teamyou_key" >&2
-    exit 1
+    tr -d '\n\r' < "$KEY_PATH"
   fi
 }
 
@@ -1627,6 +1703,74 @@ dispatch_ty_agent() {
 }
 
 # ============================================================================
+# ty auth — where this agent's key comes from (local; never prints the key)
+# ============================================================================
+
+# Where the key was found, and which agent the server says it belongs to. Two
+# agents on one machine reading one key is silent otherwise: both act as
+# whichever agent owns it. Exits 1 when the key belongs to an agent other than
+# TEAMYOU_AGENT_SLUG.
+auth_status() {
+  if [[ $# -gt 0 ]]; then echo "Unexpected argument: $1" >&2; exit 1; fi
+  resolve_key_location || exit 1
+  local me registered shown="$KEY_PATH"
+  # A substring, not ${KEY_PATH/#$HOME/~}: newer bash (Git Bash on Windows)
+  # tilde-expands that replacement back into $HOME, undoing the shortening.
+  if [[ -n "$KEY_PATH" && "$KEY_PATH" == "$HOME"/* ]]; then
+    shown="~${KEY_PATH:${#HOME}}"
+  fi
+  me=$(api_request GET /agents/me)
+  registered=$(printf '%s' "$me" | jq -r '.agent.slug // empty' 2>/dev/null)
+  jq -n \
+    --arg source "$KEY_SOURCE" \
+    --arg path "$shown" \
+    --arg slug "${TEAMYOU_AGENT_SLUG:-}" \
+    --arg registered "$registered" \
+    '{
+      keySource: $source,
+      keyPath: (if $path == "" then null else $path end),
+      configuredSlug: (if $slug == "" then null else $slug end),
+      keyBelongsTo: (if $registered == "" then null else $registered end),
+      matches: (if $slug == "" or $registered == "" then null else $slug == $registered end)
+    }'
+  if [[ -n "${TEAMYOU_AGENT_SLUG:-}" && -n "$registered" && "$registered" != "$TEAMYOU_AGENT_SLUG" ]]; then
+    echo "Warning: this key belongs to \"$registered\", not \"$TEAMYOU_AGENT_SLUG\". You are acting as another agent." >&2
+    exit 1
+  fi
+}
+
+dispatch_ty_auth() {
+  ty_dispatch_begin "ty auth" show_ty_auth_help "$@" && return 0
+  local action=$1
+  shift
+
+  case "$action" in
+    status) auth_status "$@" ;;
+    -h|--help) show_ty_auth_help ;;
+    *) echo "Unknown ty auth action: $action" >&2; echo "Run 'teamyou.sh ty auth -h' for usage" >&2; exit 1 ;;
+  esac
+}
+
+show_ty_auth_help() {
+  cat <<'EOF'
+TeamYou Auth (ty auth)
+
+Usage: teamyou.sh ty auth <action>
+
+Actions:
+  status    Where your API key comes from and which agent it belongs to
+
+Your key is found in this order (the key itself is never printed):
+  1. TEAMYOU_API_KEY
+  2. ~/.teamyou/keys/<TEAMYOU_AGENT_SLUG>.key, one file per agent
+  3. ~/.teamyou_key, from installs before per-agent files
+
+Set TEAMYOU_AGENT_SLUG in your own configuration, not a shell profile that
+other agents on this machine share.
+EOF
+}
+
+# ============================================================================
 # ty agent-drive — TY Agent Drive documents, markdown today
 # (list/read/write/delete/restore/share). Delete is recoverable: it archives the
 # document, 'list --archived' finds it and 'restore' brings it back.
@@ -2483,6 +2627,7 @@ dispatch_ty() {
     projects) dispatch_ty_projects "$@" ;;
     areas) dispatch_ty_areas "$@" ;;
     agent) dispatch_ty_agent "$@" ;;
+    auth) dispatch_ty_auth "$@" ;;
     checkin) dispatch_ty_checkin "$@" ;;
     agent-drive) dispatch_ty_agent_drive "$@" ;;
     search) dispatch_ty_search "$@" ;;
@@ -2528,7 +2673,8 @@ EOF
 Run 'teamyou.sh <provider> -h' for provider-specific help.
 
 Environment:
-  TEAMYOU_API_KEY  - API key (or create ~/.teamyou_key)
+  TEAMYOU_API_KEY     - API key (else ~/.teamyou/keys/<slug>.key; see 'ty auth -h')
+  TEAMYOU_AGENT_SLUG  - this agent's slug: picks its key file and default --slug
   TEAMYOU_API_URL  - API base URL (default: https://www.teamyou.com/api/external/v1)
 
 Examples:
@@ -2552,6 +2698,7 @@ Services:
   projects       Projects, plans, and references
   areas          Cross-pillar contexts (membership + rollup)
   agent          Agent registration and identity
+  auth           Where your API key comes from (ty auth status)
   checkin        Your agenda - pull, ack, and the setup snippet
   agent-drive    TY Agent Drive - document/file storage (markdown today)
   search         One ranked search across every type (ty search <query>)
@@ -2689,7 +2836,7 @@ Usage: teamyou.sh ty agent <action> [arguments]
 
 Actions:
   list
-  register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|other] [--name <display name>] [--model <model>]
+  register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|other] [--name <display name>] [--model <model>]
   whoami
   ack <token>
 
