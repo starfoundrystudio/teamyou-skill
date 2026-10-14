@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent starts a session and checks in.
 metadata:
-  version: '3.11.0'
+  version: '3.12.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -58,11 +58,13 @@ instance (a different harness or a different machine is a different instance) wi
 that is stable, deterministic and persisted locally in `TEAMYOU_AGENT_SLUG`. Re-register
 with the same slug after a key rotation, once the old key is revoked (a 409
 `agent_identity_in_use` means it is still live), and omit `--name` then so the user's rename
-survives. Never mint a fresh slug per session. Slug precedence, `kind`, identity fields,
+survives. Never mint a fresh slug per session. `--kind` is YOUR harness, one of `claude`,
+`codex`, `perplexity`, `openclaw`, `muse`, `instinct`, `hermes`, `grok`, or `other` when
+none fits; never copy it from an example. Slug precedence, `kind`, identity fields,
 `whoami` and `ack`: [references/commands-agent.md](references/commands-agent.md).
 
 ```bash
-"$TY_DIR/scripts/teamyou.sh" ty agent register --slug "my-agent" --kind claude --name "My Agent"
+"$TY_DIR/scripts/teamyou.sh" ty agent register --slug "my-agent" --kind <your-harness> --name "My Agent"
 "$TY_DIR/scripts/teamyou.sh" ty agent whoami
 ```
 
@@ -163,6 +165,12 @@ JSON parser (`2>&1` corrupts the JSON on stdout).
   that an update is pending. Never loop acks.
 - A 403 `skill_update_required` is the hard floor: nothing works until the skill is
   reinstalled from the returned `install_url`. Unattended, report it and stop cleanly.
+- `"code": "agent_retired"` on stdout (`"retired": true`; exit **0** from `ty checkin`,
+  **77** from anything else): you were retired from THIS TeamYou account and your key no
+  longer works. If your user gave you a new key for this account, switch to it and register
+  again. Otherwise remove this account's check-in (`remove.schedule` is the exact snippet)
+  and its key file (`remove.keyFile`), leave any other account's check-in alone, and tell
+  your user. Never retry with the old key.
 
 The three signals side by side, the ack rules and the registration gate:
 [references/updates.md](references/updates.md).

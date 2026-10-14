@@ -22,6 +22,19 @@ LEGACY_ACTION_TYPES=("check_todos")
 # 75 = sysexits EX_TEMPFAIL ("temporary failure, retry after action").
 EXIT_UPDATE_NUDGE=75
 
+# Distinct exit code for a `403 agent_retired`: this agent was retired from this
+# TeamYou account and the key it called with no longer works. Not retryable with
+# that key, so not 75. 77 = sysexits EX_NOPERM. `ty checkin` is the exception:
+# see RETIRED_IS_RESULT.
+EXIT_AGENT_RETIRED=77
+
+# Set by `ty checkin` (the pull): a retired agent's check-in is answered with the
+# retirement notice as the RESULT, on stdout, exit 0. A session-start hook adds
+# a command's stdout to the agent's context only when it exits 0, so this is the
+# one way the notice reaches an agent that checks in from a hook. Every other
+# command treats it as an error and exits $EXIT_AGENT_RETIRED.
+RETIRED_IS_RESULT=false
+
 # Skill identity headers. SKILL_VERSION/SKILL_VARIANT/SKILL_VERSION_GUID are
 # build-time tokens that the packaging build (scripts/build-teamyou-skill-variant.mjs)
 # substitutes with concrete values; the unbuilt source keeps the literal {{...}}
@@ -29,9 +42,9 @@ EXIT_UPDATE_NUDGE=75
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.11.0"
+SKILL_VERSION="3.12.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_fCKSWRdsnR1z"
+SKILL_VERSION_GUID="vg_rX7nuxEk7r78"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -285,6 +298,32 @@ emit_update_nudge() {
   fi
 }
 
+# Surface a `403 agent_retired` (Retire connected agents): the agent was retired
+# from this account, and its key was revoked.
+#   - STDOUT: the 403 body plus `"retired": true`. It carries `detail` (what to
+#     do), `agent`, `retiredAt`, `harness` and `remove { schedule, keyFile }`: the
+#     exact check-in snippet and key file to remove for THIS account.
+#   - STDERR: a readable `[TeamYou] RETIRED` projection of the same facts.
+# The caller exits 0 under RETIRED_IS_RESULT, else $EXIT_AGENT_RETIRED.
+emit_agent_retired() {
+  local body=$1
+
+  printf '%s' "$body" | jq '. + {retired: true}' 2>/dev/null \
+    || printf '%s\n' "$body"
+
+  local rendered=""
+  rendered=$(printf '%s' "$body" | jq -r '
+    "[TeamYou] RETIRED: this agent (\(.agent.slug // "?")) was retired from this TeamYou account; its key no longer works.",
+    "  \(.detail // "")",
+    "  Key file for this account: \(.remove.keyFile // "?")"
+  ' 2>/dev/null) || rendered=""
+  if [[ -n "$rendered" ]]; then
+    printf '%s\n' "$rendered" >&2
+  else
+    printf '[TeamYou] RETIRED: this agent was retired from this TeamYou account (could not parse the notice).\n' >&2
+  fi
+}
+
 # Make an authenticated API request.
 #
 # This is the single transport chokepoint for the whole skill, so the UTF-8
@@ -368,6 +407,15 @@ api_request() {
     if echo "$body" | jq -e 'type == "object" and .code == "client_update_nudge"' >/dev/null 2>&1; then
       emit_update_nudge "$body"
       exit "$EXIT_UPDATE_NUDGE"
+    fi
+    # Retired: the facts on stdout (exit 0 for a check-in, see RETIRED_IS_RESULT),
+    # never the generic stderr-only path an agent would read as a transient error.
+    if echo "$body" | jq -e 'type == "object" and .code == "agent_retired"' >/dev/null 2>&1; then
+      emit_agent_retired "$body"
+      if [[ "$RETIRED_IS_RESULT" == true ]]; then
+        exit 0
+      fi
+      exit "$EXIT_AGENT_RETIRED"
     fi
     # When the API returns a machine-readable `code` (e.g. agent_not_registered
     # or skill_update_required from the registration gate), surface the FULL body
@@ -2326,6 +2374,8 @@ dispatch_ty_search() {
 
 checkin_pull() {
   local params="" pretty=false
+  # A retired agent's check-in answers with the notice, exit 0. See RETIRED_IS_RESULT.
+  RETIRED_IS_RESULT=true
 
   while [[ $# -gt 0 ]]; do
     case $1 in

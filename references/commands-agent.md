@@ -70,9 +70,11 @@ this mode with `--slug`, `--kind` or `--name`.
 
 ## `kind` and `displayName`
 
-- **`kind`** is the harness family (`claude` / `codex` / `perplexity` / `openclaw` /
-  `other`): the closest match, or `other`. Sticky across re-registers: omit it later and
-  the existing value is kept.
+- **`kind`** is the harness family you run in (`claude` / `codex` / `perplexity` /
+  `openclaw` / `muse` / `instinct` / `hermes` / `grok` / `other`): the closest match, or
+  `other`. It is your own harness, never one copied from an example: a product that only
+  connects through this skill (a Slack assistant, a hosted bot) is `other`. Sticky across
+  re-registers: omit it later and the existing value is kept.
 - **`displayName`** (`--name`) is the label in the user's list. Set it once on first
   registration and omit it on later registers, so an in-app rename is never overwritten.
 

@@ -20,8 +20,8 @@ Your peers: every agent registered on this account, with its kind, status, wheth
 **Responses:**
 
 - `200` — The agents on this account.
-- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
-- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED (requiredPreference). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
 
@@ -52,8 +52,8 @@ The identity other agents and check-in items address. Caller-declared mode is ke
 
 - `200` — Registered agent + workspace summary + how to check in. Malformed optional manifest fields are dropped and reported in warnings.
 - `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
-- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
-- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); skill_update_required (skill below TEAMYOU_GATE_MIN_SKILL_VERSION; carries required_version, install_url, docs_url, possibly Deprecation/Sunset headers); or instance_key_mismatch (openclawInstanceId does not own the authenticated key).
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); skill_update_required (skill below TEAMYOU_GATE_MIN_SKILL_VERSION; carries required_version, install_url, docs_url, possibly Deprecation/Sunset headers); instance_key_mismatch (openclawInstanceId does not own the authenticated key); or agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key).
 - `409` — Conflict. One of: agent_identity_in_use (caller-declared mode: the slug belongs to an agent another live API key still holds; to rotate keys, revoke the old one in TeamYou, then register again — otherwise use your own slug); or agent_identity_conflict (provisioned mode: the authenticated provisioned key is linked to an agent identity that cannot be safely reconciled).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
@@ -71,7 +71,8 @@ Returns { agent: null } if the key has no linked agent. Not gated. `checkin` is 
 **Responses:**
 
 - `200` — Registered agent (or null), the live activity overlay, and how to check in.
-- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `403` — Forbidden — agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 
 ### Acknowledge the version-update nudge (relent one call)
@@ -93,6 +94,6 @@ Consumes a one-time ACK token from a client_update_nudge (403) response: relents
 
 - `200` — Call relented.
 - `400` — Bad request — ack_invalid (the ACK token is missing, malformed, already used, or was not issued to this key). Make a gated call to receive a fresh nag and token.
-- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized).
-- `403` — Forbidden — api_key_user_not_found (the key belongs to a user absent from this environment).
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `403` — Forbidden. One of: api_key_user_not_found (the key belongs to a user absent from this environment); or agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
