@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent starts a session and checks in.
 metadata:
-  version: '3.12.0'
+  version: '3.13.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -48,6 +48,8 @@ Unattended and behind on the skill: finish the task, report it, never self-updat
 
 The kinds, the outcomes and worked examples:
 [references/commands-checkin.md](references/commands-checkin.md).
+In the Codex app, a scheduled check-in can hand each piece of work to a new chat:
+[references/dispatch-codex.md](references/dispatch-codex.md).
 
 ## Register
 

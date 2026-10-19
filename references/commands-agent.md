@@ -4,7 +4,7 @@ Registration is a **display-only** record so the user can see and manage who is 
 their behalf. The API key remains the only auth boundary; the record never grants access.
 
 ```text
-teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|other] [--name <display name>] [--model <model>]
+teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|chatgpt|other] [--name <display name>] [--model <model>]
 teamyou.sh ty agent whoami
 teamyou.sh ty agent list
 teamyou.sh ty agent ack <token>

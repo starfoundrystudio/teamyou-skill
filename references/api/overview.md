@@ -117,6 +117,6 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `agents.md` | Agents | 4 |
 | `agent-drive.md` | Agent Drive | 9 |
 | `preferences.md` | Preferences | 1 |
-| `checkin.md` | Check-in | 5 |
+| `checkin.md` | Check-in | 8 |
 | `agent-drive-deprecated.md` | Agent Drive (deprecated paths) | 8 |
 | `tasks-deprecated.md` | Tasks (deprecated paths) | 10 |

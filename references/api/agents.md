@@ -33,14 +33,14 @@ POST /agents/register
 
 The identity other agents and check-in items address. Caller-declared mode is keyed on (user, slug); re-registering a slug attaches the calling key only when the caller already belongs to that agent or no other key that can still authenticate (not revoked, not expired) does — otherwise 409 agent_identity_in_use, because the identity receives that agent's check-in items. To rotate a key, revoke the old one in TeamYou first, then register with the new one. Provisioned OpenClaw mode accepts openclawInstanceId, verifies the authenticated key belongs to that clawctl instance, derives the canonical slug server-side, and reconciles grandfathered identities. Returns 200 idempotently. Skill version comes from the X-TeamYou-Version header (the legacy X-TeamYou-Skill-Version is still accepted for back-compat); variant from X-TeamYou-Skill-Variant. Not gated by registration; subject to the min-skill-version floor. The response carries a checkin object telling you how to keep showing up — the setup snippet for your harness, the cadence to use, and how many items are already waiting. It is returned on EVERY register, so re-registering is how you get the snippet back.
 
-**Skill CLI:** `teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|other] [--name <display name>] [--model <model>]`
+**Skill CLI:** `teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|chatgpt|other] [--name <display name>] [--model <model>]`
 
 **Request body:**
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `slug` | string | no | Required in caller-declared mode. Stable identity key (user, slug). Idempotent on re-register. — len 1..64, pattern |
-| `kind` | `claude` \| `codex` \| `perplexity` \| `openclaw` \| `other` \| `muse` \| `instinct` \| `hermes` \| `grok` | no | Caller-declared mode only. |
+| `kind` | `claude` \| `codex` \| `perplexity` \| `openclaw` \| `other` \| `muse` \| `instinct` \| `hermes` \| `grok` \| `chatgpt` | no | Caller-declared mode only. |
 | `displayName` | string | no | Caller-declared mode only. — len 1..120 |
 | `openclawInstanceId` | string | no | Required in provisioned OpenClaw mode. The authenticated key must be recorded on this clawctl instance; slug, kind, and displayName are then derived or preserved server-side. — len 1..255 |
 | `model` | string | no | len 1..120 |

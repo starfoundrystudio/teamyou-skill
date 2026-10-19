@@ -42,9 +42,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.12.0"
+SKILL_VERSION="3.13.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_rX7nuxEk7r78"
+SKILL_VERSION_GUID="vg_gF7tzCdl2Jne"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -2481,6 +2481,102 @@ checkin_get() {
   api_request GET "/checkin/items/$item_id"
 }
 
+# ---- claims: one worker at a time on an item (the dispatcher) ----
+# A pull returns every open item each time, so two runs of a scheduled check-in
+# (or one agent on two machines) could start the same work. Claim an item before
+# starting it; the server grants it to one caller, with a token and a two-hour
+# lease. Pass the token to `work` (state, chat link) and `release`; an ack ends
+# the claim. Claiming again with the token renews it.
+
+# The `ref` object (where the work runs) from --harness/--url/--label, or "null".
+checkin_ref_json() {
+  local harness=$1 url=$2 label=$3
+  if [[ -z "$harness" && -z "$url" && -z "$label" ]]; then
+    printf 'null'
+    return
+  fi
+  if [[ -z "$harness" ]]; then
+    echo "Error: --harness is required with --url or --label (for example --harness codex-app)" >&2
+    exit 1
+  fi
+  jq -n --arg harness "$harness" --arg url "$url" --arg label "$label" \
+    '{harness: $harness}
+     | if $url != "" then . + {url: $url} else . end
+     | if $label != "" then . + {label: $label} else . end'
+}
+
+checkin_claim() {
+  local item_id="" token="" harness="" url="" label=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      --harness) require_flag_arg "--harness" $#; harness=$2; shift 2 ;;
+      --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
+      --label) require_flag_arg "--label" $#; label=$2; shift 2 ;;
+      -*) echo "Unknown option: $1" >&2; exit 1 ;;
+      *)
+        if [[ -z "$item_id" ]]; then item_id=$1; shift; else echo "Unexpected argument: $1" >&2; exit 1; fi
+        ;;
+    esac
+  done
+  require_value "item id" "$item_id"
+
+  local ref data
+  ref=$(checkin_ref_json "$harness" "$url" "$label")
+  data=$(jq -n --arg token "$token" --argjson ref "$ref" \
+    '{}
+     | if $token != "" then . + {token: $token} else . end
+     | if $ref != null then . + {ref: $ref} else . end')
+  api_request POST "/checkin/items/$item_id/claim" "$data"
+}
+
+checkin_work() {
+  local item_id="" token="" state="" harness="" url="" label=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      --state) require_flag_arg "--state" $#; state=$2; shift 2 ;;
+      --harness) require_flag_arg "--harness" $#; harness=$2; shift 2 ;;
+      --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
+      --label) require_flag_arg "--label" $#; label=$2; shift 2 ;;
+      -*) echo "Unknown option: $1" >&2; exit 1 ;;
+      *)
+        if [[ -z "$item_id" ]]; then item_id=$1; shift; else echo "Unexpected argument: $1" >&2; exit 1; fi
+        ;;
+    esac
+  done
+  require_value "item id" "$item_id"
+  require_value "--token" "$token"
+  case "$state" in
+    ""|running|waiting_for_you) ;;
+    *) echo "Error: --state must be running or waiting_for_you" >&2; exit 1 ;;
+  esac
+
+  local ref data
+  ref=$(checkin_ref_json "$harness" "$url" "$label")
+  data=$(jq -n --arg token "$token" --arg state "$state" --argjson ref "$ref" \
+    '{claimToken: $token}
+     | if $state != "" then . + {state: $state} else . end
+     | if $ref != null then . + {ref: $ref} else . end')
+  api_request PATCH "/checkin/items/$item_id" "$data"
+}
+
+checkin_release() {
+  local item_id="" token=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      -*) echo "Unknown option: $1" >&2; exit 1 ;;
+      *)
+        if [[ -z "$item_id" ]]; then item_id=$1; shift; else echo "Unexpected argument: $1" >&2; exit 1; fi
+        ;;
+    esac
+  done
+  require_value "item id" "$item_id"
+  require_value "--token" "$token"
+  api_request POST "/checkin/items/$item_id/release" "$(jq -n --arg token "$token" '{claimToken: $token}')"
+}
+
 checkin_send() {
   local content="" to="" anchor_type="" anchor_id="" notify=false
 
@@ -2655,6 +2751,9 @@ dispatch_ty_checkin() {
     pull) checkin_pull "$@" ;;
     ack) checkin_ack "$@" ;;
     get) checkin_get "$@" ;;
+    claim) checkin_claim "$@" ;;
+    work) checkin_work "$@" ;;
+    release) checkin_release "$@" ;;
     setup) checkin_setup "$@" ;;
     send) checkin_send "$@" ;;
     sent) checkin_sent "$@" ;;
@@ -2886,7 +2985,7 @@ Usage: teamyou.sh ty agent <action> [arguments]
 
 Actions:
   list
-  register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|other] [--name <display name>] [--model <model>]
+  register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|chatgpt|other] [--name <display name>] [--model <model>]
   whoami
   ack <token>
 
@@ -2961,6 +3060,9 @@ Actions:
   pull [--limit N] [--cursor CURSOR] [--wait SECONDS] [--pretty]
   ack <item_id> [--outcome done|skipped|deferred|failed] [--reply <text>]
   get <item_id>
+  work <item_id> --token <claim_token> [--state running|waiting_for_you] [--harness <name> --url <link> --label <text>]
+  claim <item_id> [--token <claim_token>] [--harness <name> --url <link> --label <text>]
+  release <item_id> --token <claim_token>
   send --to <agent> <content> [--anchor-type topic|task|project|drive|routine --anchor-id ID] [--notify-on-reply]
   sent [--limit N] [--cursor CURSOR]
 
