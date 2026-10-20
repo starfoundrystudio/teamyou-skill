@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent starts a session and checks in.
 metadata:
-  version: '3.14.0'
+  version: '3.15.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -35,6 +35,10 @@ forms in a browser cannot authenticate these commands: don't use it or offer it 
 Otherwise use your own owner-only file, `~/.teamyou/keys/<slug>.key`, found by
 `TEAMYOU_AGENT_SLUG`. Set the slug in your own config, not a shell profile other agents share.
 `ty auth status` shows which key you use, where it came from, and whose it is.
+
+Writes you might repeat by accident (creating, adding details, commenting, sending or claiming a
+check-in item) are safe to re-run: TeamYou does each once and returns the first result, with a
+`Note:` on stderr. To really repeat one within 10 minutes, add `--no-dedupe`.
 
 ## Check in (do this first)
 

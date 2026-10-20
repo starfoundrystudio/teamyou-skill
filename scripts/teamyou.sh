@@ -42,9 +42,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.14.0"
+SKILL_VERSION="3.15.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_MQ4xcZqsbLZZ"
+SKILL_VERSION_GUID="vg_nPBTJAYYxlzk"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -324,6 +324,49 @@ emit_agent_retired() {
   fi
 }
 
+# ---- Idempotency keys (contract 2.23.0) -------------------------------------
+#
+# The writes that can be repeated by accident (creating a task, project, topic,
+# area, heartbeat action or scheduled action, adding details, commenting, sending
+# or claiming a check-in item) go through api_write, which sends an
+# Idempotency-Key. TeamYou runs a keyed write once and hands the first result
+# back to any repeat, so a retry never makes a second task or wakes an agent
+# twice. The key is derived from the request itself ("auto:" plus a sha256 of
+# the method, path and exact body; TeamYou keeps it for 10 minutes), so
+# re-running the same command replays instead of duplicating. The global flag
+# --no-dedupe sends no key, for a write the agent really means to repeat.
+TY_NO_DEDUPE=false
+IDEMPOTENT_WRITE=false
+
+# sha256 of stdin as lowercase hex: sha256sum (Linux, Git Bash), shasum
+# (macOS), or openssl, whichever exists.
+sha256_hex() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -c1-64
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | cut -c1-64
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 -r | cut -c1-64
+  fi
+}
+
+# The key for one write, or nothing when the caller opted out (or no hash
+# tool exists, in which case the write simply goes unkeyed, as before).
+idempotency_key_for() {
+  local method=$1 path=$2 data=$3
+  [[ "$TY_NO_DEDUPE" == true ]] && return 0
+  local digest
+  digest=$(printf '%s\n%s\n%s' "$method" "$path" "$data" | sha256_hex)
+  [[ -n "$digest" ]] && printf 'auto:%s' "$digest"
+  return 0
+}
+
+# A write TeamYou should run at most once (see above).
+api_write() {
+  local IDEMPOTENT_WRITE=true
+  api_request "$@"
+}
+
 # Make an authenticated API request.
 #
 # This is the single transport chokepoint for the whole skill, so the UTF-8
@@ -385,17 +428,34 @@ api_request() {
   # curl_args while the body arrives this way — a redirect or a retry would
   # resend an empty body. Use a temp file with `--data-binary @file` if that
   # ever becomes a requirement.
-  local response
-  if [[ -n "$data" ]]; then
-    curl_args+=(--data-binary @-)
-    response=$(printf '%s' "$data" | curl "${curl_args[@]}")
-  else
-    response=$(curl "${curl_args[@]}")
+  local idem_key="" hdr_file=""
+  if [[ "$IDEMPOTENT_WRITE" == true ]]; then
+    idem_key=$(idempotency_key_for "$method" "$path" "$data")
+  fi
+  if [[ -n "$idem_key" ]]; then
+    # The response headers say whether TeamYou replayed an earlier result.
+    hdr_file=$(mktemp "${TMPDIR:-/tmp}/ty-headers.XXXXXX")
+    curl_args+=(-H "Idempotency-Key: $idem_key" -D "$hdr_file")
   fi
 
+  local response rc=0
+  if [[ -n "$data" ]]; then
+    curl_args+=(--data-binary @-)
+    response=$(printf '%s' "$data" | curl "${curl_args[@]}") || rc=$?
+  else
+    response=$(curl "${curl_args[@]}") || rc=$?
+  fi
+  local replayed=false
+  if [[ -n "$hdr_file" ]]; then
+    grep -qi '^idempotent-replayed:[[:space:]]*true' "$hdr_file" 2>/dev/null && replayed=true
+    rm -f "$hdr_file"
+  fi
+  # A failed curl ends the command with curl's own exit code, as it always has.
+  (( rc != 0 )) && exit "$rc"
+
   local http_code
-  http_code=$(echo "$response" | tail -n1)
   local body
+  http_code=$(echo "$response" | tail -n1)
   body=$(echo "$response" | sed '$d')
 
   if [[ "$http_code" -ge 400 ]]; then
@@ -451,6 +511,10 @@ api_request() {
   if [[ -n "$notice" ]]; then
     printf '[TeamYou] %s\n' "$notice" >&2
   fi
+  if [[ "$replayed" == true ]]; then
+    # "Note:", not "[TeamYou]": a [TeamYou] line is the skill-update advisory.
+    printf 'Note: %s\n' "This is the result of an earlier identical request; nothing was written again. To repeat it on purpose, run the command again with --no-dedupe." >&2
+  fi
 
   echo "$body"
 }
@@ -491,7 +555,7 @@ topics_create() {
     '{name: $name, oneSentenceDescription: $desc}
     | if $summary != "" then . + {summary: $summary} else . end')
 
-  api_request POST /topics "$data"
+  api_write POST /topics "$data"
 }
 
 topics_get() {
@@ -557,7 +621,7 @@ details_add() {
   local data
   data=$(jq -n --args '$ARGS.positional | map({detail: .})' "${details[@]}" | jq '{details: .}')
 
-  api_request POST "/topics/$topic_id/details" "$data"
+  api_write POST "/topics/$topic_id/details" "$data"
 }
 
 details_update() {
@@ -849,7 +913,7 @@ tasks_create() {
         | if $before != "" then . + {before: $before} else . end
       )} else . end')
 
-  api_request POST /tasks "$data"
+  api_write POST /tasks "$data"
 }
 
 tasks_get() {
@@ -989,7 +1053,7 @@ work_comment_add() {
   local data
   data=$(jq -n --arg body "$text" --arg reply "$reply_to" \
     '{body: $body} | if $reply != "" then . + {inReplyToCommentId: $reply} else . end')
-  api_request POST "/$noun/$target_id/comments" "$data"
+  api_write POST "/$noun/$target_id/comments" "$data"
 }
 
 work_follow() {
@@ -1195,7 +1259,7 @@ projects_create() {
           else . end)')
   fi
 
-  api_request POST /projects "$data"
+  api_write POST /projects "$data"
 }
 
 projects_get() {
@@ -1485,7 +1549,7 @@ areas_create() {
     | if $description != "" then . + {description: $description} else . end
     | if $archived == "true" then . + {isArchived: true} else . end')
 
-  api_request POST /areas "$data"
+  api_write POST /areas "$data"
 }
 
 areas_get() {
@@ -2527,7 +2591,7 @@ checkin_claim() {
     '{}
      | if $token != "" then . + {token: $token} else . end
      | if $ref != null then . + {ref: $ref} else . end')
-  api_request POST "/checkin/items/$item_id/claim" "$data"
+  api_write POST "/checkin/items/$item_id/claim" "$data"
 }
 
 checkin_work() {
@@ -2609,7 +2673,7 @@ checkin_send() {
      | if $atype != "" then . + {anchor: {type: $atype, id: $aid}} else . end
      | if $notify then . + {notifyOnReply: true} else . end')
 
-  api_request POST /checkin/send "$data"
+  api_write POST /checkin/send "$data"
 }
 
 # Items this agent SENT, newest first, each with the recipient's status, outcome
@@ -2820,6 +2884,9 @@ EOF
   cat <<'EOF'
 
 Run 'teamyou.sh <provider> -h' for provider-specific help.
+
+Global flag (any command, anywhere on the line):
+  --no-dedupe  really repeat a write the helper would otherwise run once
 
 Environment:
   TEAMYOU_API_KEY     - API key (else ~/.teamyou/keys/<slug>.key; see 'ty auth -h')
@@ -3087,6 +3154,17 @@ if [[ $# -eq 0 ]] || [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
   show_help
   exit 0
 fi
+
+# A global flag any command accepts, wherever it appears (see api_write).
+args=()
+for arg in "$@"; do
+  if [[ "$arg" == --no-dedupe ]]; then
+    TY_NO_DEDUPE=true
+  else
+    args+=("$arg")
+  fi
+done
+set -- "${args[@]}"
 
 provider=$1
 shift
