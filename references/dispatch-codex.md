@@ -46,7 +46,9 @@ Run this on each scheduled run, in order:
    normal way (see the kinds in `commands-checkin.md`): they cannot be claimed.
 2. Leave alone every item whose `work.state` is not null: someone holds it.
 3. Do the quick items yourself and ack them: `answered`, `commented`, and a `mentioned`
-   that only needs a one-line reply. A new chat is for real work.
+   that only needs a one-line reply. A worker chat is for real work. This holds even when
+   the item has a `work.anchorChat`: earlier workers wrote what they learned back to
+   TeamYou, so read it there and answer. Only real work goes back to the earlier chat.
 4. Put the rest into groups (next section), and take **one group per run**: the group
    holding the first remaining item in the agenda. The other groups wait for later runs;
    their agenda order is kept.
@@ -54,8 +56,15 @@ Run this on each scheduled run, in order:
    `ty checkin claim ITEM_ID --harness codex-app --label Codex`.
    A 409 `checkin_item_claimed` means another run got there first: drop that item from
    the group. Keep each `claim.token`.
-6. Open one worker with `create_thread`, using the worker prompt below. If that fails,
-   give every item back at once: `ty checkin release ITEM_ID --token TOKEN`.
+6. Send the group to one worker chat, with the worker prompt below:
+   - **Continue in an earlier chat when there is one.** If an item in the group has
+     `work.anchorChat` with a `codex://threads/<id>` link, that chat already worked on the
+     same thing. Send the prompt into it with `send_message_to_thread`, using the `<id>`
+     part as the thread id. It picks the message up and carries on, with what it already
+     knows. If several items name different chats, use the first item's.
+   - **Otherwise open a new one** with `create_thread`.
+   - If sending fails (the chat was archived or deleted), open a new one instead. If that
+     fails too, give every item back at once: `ty checkin release ITEM_ID --token TOKEN`.
 7. Write one line in your own chat about what you dispatched. Ack nothing you dispatched:
    the worker acks it.
 
@@ -82,6 +91,9 @@ chats never act on the same thing at once.
   an anchored group, when they are clearly about the same request (the same person
   following up, the same document, the same goal). When in doubt, group: one chat doing
   two separate things costs less than two chats each missing half the picture.
+- **Earlier work on the same thing.** An item's `work.anchorChat` names the chat that last
+  worked on its anchor for you. The group goes to that chat (Controller, step 6), so a
+  follow-up lands where the context already is.
 - **Dependencies.** If one item needs another's result, they are one group, and the
   prompt lists them in the order to do them. Work with many dependent steps belongs in a
   TeamYou project: its plan hands out one step at a time, so a later step never arrives
@@ -117,6 +129,10 @@ chats never act on the same thing at once.
    `ty checkin ack ITEM_ID --outcome done|skipped|failed --reply "<what you did, or why not>"`.
    For a person's `note`, the reply is your answer to them: make it complete.
 
+**Follow-ups come back to this chat.** A later run may send this chat another worker
+prompt, for new items on the same thing. Handle it the same way, from step 1, using what
+you already know here. Your earlier items are already closed; do not ack them again.
+
 ## When something goes wrong
 
 - **A claim is gone** (`work` answers 409 `checkin_claim_required`, or
@@ -125,7 +141,7 @@ chats never act on the same thing at once.
 - **You cannot do an item after all**: ack it `skipped` or `failed` with the reason. Use
   `ty checkin release ITEM_ID --token TOKEN` only to hand it back for another try.
 - **The app quit mid-work**: the claims expire after two hours and the items come back to
-  the next controller run, which opens a new chat for them.
+  the next controller run, which sends them back to the same chat (its link is recorded).
 - **A worker never started** (claimed, but no chat): the items show as claimed with no
   link until the claims expire. Report it in the controller chat; do not claim them again.
 

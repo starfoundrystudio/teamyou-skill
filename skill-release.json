@@ -1,10 +1,10 @@
 {
   "name": "teamyou",
   "variant": "public",
-  "version": "3.13.0",
-  "git_commit": "65b00230e63b4a023374e291e5398b4f89bd496e",
-  "released_at_utc": "2026-10-19T23:30:36Z",
-  "payload_sha256": "006d304db9bb64842d695b1d1475f0d0520392be59c317d1585fa406585ae9a2",
+  "version": "3.14.0",
+  "git_commit": "8f92372c8fddb18f8c3739702a336db0854f3c0b",
+  "released_at_utc": "2026-10-20T20:35:52Z",
+  "payload_sha256": "66c012e4286b4d693d8fe6f6e20c3b88f66687e60f3ca20c266e05ba738fdc68",
   "min_codex_version": "1.0.0",
   "release_tag_prefix": "skill/teamyou-public/v"
 }

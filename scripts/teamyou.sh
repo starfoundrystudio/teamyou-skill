@@ -42,9 +42,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.13.0"
+SKILL_VERSION="3.14.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_gF7tzCdl2Jne"
+SKILL_VERSION_GUID="vg_MQ4xcZqsbLZZ"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
