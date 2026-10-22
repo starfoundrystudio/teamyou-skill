@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.15.2'
+  version: '3.16.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -67,8 +67,11 @@ with the same slug after a key rotation, once the old key is revoked (a 409
 `agent_identity_in_use` means it is still live), and omit `--name` then so the user's rename
 survives. Never mint a fresh slug per session. `--kind` is YOUR harness, one of `claude`,
 `codex`, `perplexity`, `openclaw`, `muse`, `instinct`, `hermes`, `grok`, or `other` when
-none fits; never copy it from an example. Slug precedence, `kind`, identity fields,
-`whoami` and `ack`: [references/commands-agent.md](references/commands-agent.md).
+none fits; never copy it from an example. The one sanctioned slug change is your owner's
+rename: a register under the old slug answers 409 `agent_renamed`, and the helper copies
+your key file, registers you under the new slug and prints the one config line to change.
+Slug precedence, `kind`, identity fields, `whoami`, `ack` and renames:
+[references/commands-agent.md](references/commands-agent.md).
 
 ```bash
 "$TY_DIR/scripts/teamyou.sh" ty agent register --slug "my-agent" --kind <your-harness> --name "My Agent"
@@ -84,7 +87,8 @@ If a person is present, surface what you found and ask before anything that chan
 can see a document or that spends their attention. If you are running unattended (a cron,
 a scheduled job, no one to answer), finish the task, report what you saw in your output,
 and never stop early, update yourself, or change how you identify yourself. Every notice
-below follows this rule.
+below follows this rule. The one exception is a slug your owner renamed (`agent_renamed`):
+you follow their rename, and report the config line it needs.
 
 ## Conventions
 
@@ -125,7 +129,7 @@ Long form, the entity mapping and worked workflows:
 | `projects`    | `create` (one call: plan + refs), `get`, `doc-push` | [commands-projects.md](references/commands-projects.md)       |
 | `areas`       | `refs-add` (file a topic), `get --depth full`       | [commands-areas.md](references/commands-areas.md)             |
 | `agent-drive` | `push`, `search`                                    | [commands-agent-drive.md](references/commands-agent-drive.md) |
-| `agent`       | `register`, `whoami`                                | [commands-agent.md](references/commands-agent.md)             |
+| `agent`       | `register`, `whoami`, `ack-rename`                  | [commands-agent.md](references/commands-agent.md)             |
 | `checkin`     | `ty checkin`, `ack ID --outcome …`                  | [commands-checkin.md](references/commands-checkin.md)         |
 | `search`      | `<query>` (every type, one list), `related`         | [commands-search.md](references/commands-search.md)           |
 
@@ -178,8 +182,16 @@ JSON parser (`2>&1` corrupts the JSON on stdout).
   again. Otherwise remove this account's check-in (`remove.schedule` is the exact snippet)
   and its key file (`remove.keyFile`), leave any other account's check-in alone, and tell
   your user. Never retry with the old key.
+- `"code": "agent_renamed"` (exit **78**, `"renamed": true` on stdout; also a check-in
+  `notice` with `meta.notice_type` `agent_renamed`): your owner renamed your slug. You are
+  the same agent. `ty agent register` does the switch itself (copies the key file, or
+  moves it when `TEAMYOU_AGENT_SLUG` is unset, and registers under `rename.to`) and prints
+  `TEAMYOU_AGENT_SLUG=<new>` when that is set. It never edits your
+  harness's settings: with a person present, show them that line and change it only with
+  their go-ahead; unattended, report it. Delete the old key file once the line is changed.
+  Ack the notice `done` once you have switched.
 
-The three signals side by side, the ack rules and the registration gate:
+The signals side by side, the ack rules and the registration gate:
 [references/updates.md](references/updates.md).
 
 ## MCP

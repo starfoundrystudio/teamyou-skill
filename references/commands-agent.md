@@ -1,4 +1,4 @@
-# Commands: `ty agent` (registration, identity, whoami, ack)
+# Commands: `ty agent` (registration, identity, whoami, ack, renames)
 
 Registration is a **display-only** record so the user can see and manage who is calling on
 their behalf. The API key remains the only auth boundary; the record never grants access.
@@ -7,6 +7,7 @@ their behalf. The API key remains the only auth boundary; the record never grant
 teamyou.sh ty agent register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|chatgpt|other] [--name <display name>] [--model <model>]
 teamyou.sh ty agent whoami
 teamyou.sh ty agent list
+teamyou.sh ty agent ack-rename
 teamyou.sh ty agent ack <token>
 ```
 
@@ -26,6 +27,7 @@ selects the provisioned OpenClaw mode.
 - [Richer identity (optional, display-only)](#richer-identity-optional-display-only)
 - [Status, and the self-healing gate](#status-and-the-self-healing-gate)
 - [ack](#ack)
+- [If your slug was renamed](#if-your-slug-was-renamed)
 - [First session](#first-session)
 - [Examples](#examples)
 
@@ -101,6 +103,51 @@ the `ack_command` the nudge carries, then re-run the original command. Each ack 
 and visible to the owner; never loop it. The full rule set is in the updates reference
 linked from `SKILL.md`.
 
+## If your slug was renamed
+
+Your slug is yours to keep stable, but the account's owner can rename it from the web. You
+stay the same agent: the same `agt_` id, tasks, check-in items and history. Only the name
+changed, so your local config is stale until you switch it. This is the one sanctioned slug
+change: you follow the owner's rename, you never start one.
+
+You find out in one of three ways:
+
+- `ty agent register` under the old slug answers 409 `agent_renamed`. Nothing is created.
+  The helper handles it: with `TEAMYOU_AGENT_SLUG` set to the old slug it **copies**
+  `~/.teamyou/keys/<old>.key` to `<new>.key` and prints the one line to change,
+  `TEAMYOU_AGENT_SLUG=<new>`; with `TEAMYOU_AGENT_SLUG` unset (your key was found as the
+  one key file there is) it **moves** it, so the one file carries the new name and no
+  config line needs to change. An existing `<new>.key` is left alone. Then it registers
+  again under the new slug, which signs the rename off. stdout is the register result plus
+  `renamed { from, to, keyFile, configLine }`, where `keyFile` is `copied`, `moved`, `kept`,
+  `none` (the key is not in a slug-named file), `copy_failed` or `move_failed`, and
+  `configLine` is null when nothing needs to change.
+- A check-in `notice` with `meta.notice_type` `agent_renamed`, priority 1. Its `meta` has
+  `from`, `to`, `key_file_from`, `key_file_to` and `register`, and its command registers
+  you under the new slug. Ack it `done` once you have switched; only `done` signs off.
+- `ty agent whoami` shows `agent.pendingRename { from, to, renamedAt, steps }`, and
+  `ty auth status` prints the switch (exit 78) instead of calling it another agent's key.
+  It asks the server whether `TEAMYOU_AGENT_SLUG` is one of YOUR previous slugs, so it
+  says so after the rename is signed off too, and for any slug of a chain of renames.
+
+Then:
+
+1. Change `TEAMYOU_AGENT_SLUG` to the new slug in your own config. The helper never edits
+   a harness's settings; with a person present, change it only with their go-ahead, and
+   unattended, report the line.
+2. Delete the old key file once the config says the new slug. `ty auth status` names any
+   key file that still holds your key.
+3. If you switched without registering or acking the notice, sign off with
+   `ty agent ack-rename`. It is idempotent: with nothing pending it answers
+   `acknowledged: 0`. It sends your `TEAMYOU_AGENT_SLUG` as the slug you switched to: if
+   the owner renamed you again since you read the steps, nothing is signed off and it
+   fails with `rename_target_changed` and the rename as it stands now. Read it and switch
+   again.
+
+The old slug stays reserved for you, so a stale config anywhere keeps getting the 409
+rather than becoming a new agent. Any other command that meets `agent_renamed` exits
+**78** with the body on stdout (`"renamed": true`) and the steps on stderr.
+
 ## First session
 
 Your first check-in on an unregistered key returns a `system` item telling you to
@@ -142,4 +189,7 @@ work with the task at hand, not with a sweep of the workspace.
 
 # Check status
 "$TY_DIR/scripts/teamyou.sh" ty agent whoami
+
+# Your owner renamed you and you switched by hand: sign it off
+"$TY_DIR/scripts/teamyou.sh" ty agent ack-rename
 ```

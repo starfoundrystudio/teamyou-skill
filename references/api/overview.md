@@ -114,7 +114,7 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `tasks.md` | Tasks | 10 |
 | `projects.md` | Projects | 13 |
 | `areas.md` | Areas | 8 |
-| `agents.md` | Agents | 4 |
+| `agents.md` | Agents | 5 |
 | `agent-drive.md` | Agent Drive | 9 |
 | `preferences.md` | Preferences | 1 |
 | `checkin.md` | Check-in | 8 |

@@ -7,20 +7,27 @@ re-identifies itself.
 
 ## Contents
 
-- [The three signals](#the-three-signals)
+- [The signals](#the-signals)
 - [Advisory notice on stderr](#advisory-notice-on-stderr)
 - [Client update nudge (exit 75)](#client-update-nudge-exit-75)
 - [Hard floor: skill_update_required](#hard-floor-skill_update_required)
 - [Registration gate: agent_not_registered](#registration-gate-agent_not_registered)
 - [Modes, expanded](#modes-expanded)
 
-## The three signals
+## The signals
 
-| Signal                   | Surface                                 | Meaning                                | What to do                                                       |
-| ------------------------ | --------------------------------------- | -------------------------------------- | ---------------------------------------------------------------- |
-| `agent_ecosystem_notice` | `200` plus a `[TeamYou]` line on stderr | Advisory: a newer version exists       | Keep working; mention it once; offer to update only with consent |
-| `client_update_nudge`    | `403`, exit `75`, `code` on stdout      | Action needed: this one call was held  | Retry once or `ty agent ack <token>`, then continue and report   |
-| `skill_update_required`  | `403` from the gate                     | Hard floor: below the required version | Nothing works until reinstalled from `install_url`               |
+| Signal                   | Surface                                          | Meaning                                              | What to do                                                        |
+| ------------------------ | ------------------------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------- |
+| `agent_ecosystem_notice` | `200` plus a `[TeamYou]` line on stderr          | Advisory: a newer version exists                     | Keep working; mention it once; offer to update only with consent  |
+| `client_update_nudge`    | `403`, exit `75`, `code` on stdout               | Action needed: this one call was held                | Retry once or `ty agent ack <token>`, then continue and report    |
+| `skill_update_required`  | `403` from the gate                              | Hard floor: below the required version               | Nothing works until reinstalled from `install_url`                |
+| `agent_renamed`          | `409` from register, exit `78`, `code` on stdout | Your owner renamed your slug; you are the same agent | `ty agent register` switches for you; change `TEAMYOU_AGENT_SLUG` |
+
+`agent_renamed` is not about the skill's version, but it is the other signal that asks you to
+change local config, and the one sanctioned exception to "never re-identify yourself": you
+follow your owner's rename. It also arrives as a check-in `notice` (`meta.notice_type`
+`agent_renamed`) and as `agent.pendingRename` in `ty agent whoami`. The steps are in the
+renames section of the agent commands reference.
 
 ## Advisory notice on stderr
 

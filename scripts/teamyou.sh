@@ -47,6 +47,19 @@ EXIT_UPDATE_NUDGE=75
 # see RETIRED_IS_RESULT.
 EXIT_AGENT_RETIRED=77
 
+# Distinct exit code for a `409 agent_renamed` (TYDEV-1348): the account's owner
+# renamed this agent's slug, and this machine still calls it by the old one. The
+# agent is the same (same id, tasks and history); only its local config is stale.
+# 78 = sysexits EX_CONFIG. `ty agent register` handles it itself (see
+# register_after_rename) and `ty auth status` reports it instead of calling it
+# impersonation.
+EXIT_AGENT_RENAMED=78
+
+# Set by agent_register around its own register call: it handles a 409
+# agent_renamed itself, so api_request hands the body back on stdout without the
+# stderr block (agent_register prints its own, describing what it did).
+RENAME_HANDLED_BY_CALLER=false
+
 # Set by `ty checkin` (the pull): a retired agent's check-in is answered with the
 # retirement notice as the RESULT, on stdout, exit 0. A scheduler or harness that
 # runs the check-in hands its stdout to the agent only when it exits 0, so this
@@ -61,9 +74,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.15.2"
+SKILL_VERSION="3.16.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_8ZdkZ51706st"
+SKILL_VERSION_GUID="vg_OtW74beiNjkw"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -343,6 +356,33 @@ emit_agent_retired() {
   fi
 }
 
+# Surface a `409 agent_renamed` (TYDEV-1348): the owner renamed this agent's
+# slug, and this call still named the old one. Nothing was created.
+#   - STDOUT: the 409 body plus `"renamed": true`. It carries `detail`, `agent`
+#     and `rename { from, to, renamedAt, steps { env, keyFile, register, ack } }`.
+#   - STDERR: a readable `[TeamYou] RENAMED` block with the steps.
+# The caller exits $EXIT_AGENT_RENAMED.
+emit_agent_renamed() {
+  local body=$1
+
+  printf '%s' "$body" | jq '. + {renamed: true}' 2>/dev/null \
+    || printf '%s\n' "$body"
+
+  local rendered=""
+  rendered=$(printf '%s' "$body" | jq -r '
+    "[TeamYou] RENAMED: your owner renamed this agent from \(.rename.from // "?") to \(.rename.to // "?"). It is the same agent, with the same id, tasks and history; only your local config is stale.",
+    "  1. Copy your key file \(.rename.steps.keyFile.from // "?") to \(.rename.steps.keyFile.to // "?")",
+    "  2. Set TEAMYOU_AGENT_SLUG=\(.rename.to // "?") in your own config",
+    "  3. Register: \(.rename.steps.register // "?") (this signs the rename off)",
+    "  4. Or, if you already switched, sign it off: \(.rename.steps.ack // "ty agent ack-rename")"
+  ' 2>/dev/null) || rendered=""
+  if [[ -n "$rendered" ]]; then
+    printf '%s\n' "$rendered" >&2
+  else
+    printf '[TeamYou] RENAMED: your owner renamed this agent (could not parse the notice).\n' >&2
+  fi
+}
+
 # ---- Idempotency keys (contract 2.23.0) -------------------------------------
 #
 # The writes that can be repeated by accident (creating a task, project, topic,
@@ -495,6 +535,16 @@ api_request() {
         exit 0
       fi
       exit "$EXIT_AGENT_RETIRED"
+    fi
+    # Renamed: the steps on stdout and stderr, and a distinct exit code. Only
+    # register answers it, and agent_register handles it itself.
+    if echo "$body" | jq -e 'type == "object" and .code == "agent_renamed"' >/dev/null 2>&1; then
+      if [[ "$RENAME_HANDLED_BY_CALLER" == true ]]; then
+        printf '%s\n' "$body"
+      else
+        emit_agent_renamed "$body"
+      fi
+      exit "$EXIT_AGENT_RENAMED"
     fi
     # When the API returns a machine-readable `code` (e.g. agent_not_registered
     # or skill_update_required from the registration gate), surface the FULL body
@@ -1803,7 +1853,117 @@ agent_register() {
     | if $name != "" then . + {displayName: $name} else . end
     | if $model != "" then . + {model: $model} else . end')
 
-  api_request POST /agents/register "$data"
+  local out="" rc=0
+  out=$(RENAME_HANDLED_BY_CALLER=true api_request POST /agents/register "$data") || rc=$?
+  if (( rc == EXIT_AGENT_RENAMED )); then
+    register_after_rename "$out" "$slug" "$data"
+    return
+  fi
+  [[ -n "$out" ]] && printf '%s\n' "$out"
+  (( rc != 0 )) && exit "$rc"
+  return 0
+}
+
+# A register under the old slug answered 409 agent_renamed (TYDEV-1348): the
+# owner renamed this agent. Do the safe part of the switch here, and report the
+# one line only the operator can change.
+#   1. The key file ~/.teamyou/keys/<from>.key, unless <to>.key already exists,
+#      which is left alone:
+#      - TEAMYOU_AGENT_SLUG names <from>: COPY it. A move would break key
+#        resolution while the config still says <from>.
+#      - TEAMYOU_AGENT_SLUG is unset (the key was found as the ONE key file
+#        there is): MOVE it. A copy would leave two key files, and from then on
+#        every call refuses with "Several agents keep keys on this machine".
+#        After the move the one file is <to>.key, so no config line is needed.
+#   2. Register again as <to>, with the key found as before, and registering
+#      under the new slug from the agent's own key signs the rename off
+#      (`via: register`).
+#   3. With TEAMYOU_AGENT_SLUG set, print `TEAMYOU_AGENT_SLUG=<to>`. This never
+#      edits a harness's settings: an owner rename is the one sanctioned slug
+#      change, and the agent follows it by telling its operator, not by
+#      rewriting its own configuration.
+# Anything it cannot do safely (a `from` that is not the slug it sent, a `to`
+# that is not a valid slug) falls back to the plain RENAMED notice, exit 78.
+register_after_rename() {
+  local body=$1 sent=$2 data=$3
+  local from to key_from_shown key_to_shown
+  from=$(printf '%s' "$body" | jq -r '.rename.from // empty' 2>/dev/null) || from=""
+  to=$(printf '%s' "$body" | jq -r '.rename.to // empty' 2>/dev/null) || to=""
+  if [[ -z "$to" || "$from" != "$sent" || "$to" == "$from" \
+        || ! "$to" =~ ^[A-Za-z0-9][A-Za-z0-9\ _.-]*$ ]]; then
+    emit_agent_renamed "$body"
+    exit "$EXIT_AGENT_RENAMED"
+  fi
+  key_from_shown="~/.teamyou/keys/$from.key"
+  key_to_shown="~/.teamyou/keys/$to.key"
+
+  # Step 1: the key file. Only an agent-file key named for the old slug is
+  # carried over; a key from TEAMYOU_API_KEY, a preview file or the legacy file
+  # has nothing named for the slug.
+  local key_action="none"
+  local slug_configured="false"
+  [[ -n "${TEAMYOU_AGENT_SLUG:-}" ]] && slug_configured="true"
+  resolve_key_location 2>/dev/null || true
+  if [[ "$KEY_SOURCE" == "agent-file" && "$KEY_PATH" == "$TEAMYOU_KEYS_DIR/$from.key" ]]; then
+    local target="$TEAMYOU_KEYS_DIR/$to.key"
+    if [[ -e "$target" ]]; then
+      key_action="kept"
+    elif [[ "$slug_configured" == "false" ]]; then
+      # Found as the only key file: keep it the only one, under the new name.
+      if mv "$KEY_PATH" "$target" 2>/dev/null; then
+        chmod 600 "$target" 2>/dev/null || true
+        key_action="moved"
+      else
+        key_action="move_failed"
+      fi
+    elif cp -p "$KEY_PATH" "$target" 2>/dev/null; then
+      chmod 600 "$target" 2>/dev/null || true
+      key_action="copied"
+    else
+      key_action="copy_failed"
+    fi
+  fi
+
+  # Step 2: register again under the new slug, with the same kind/name/model.
+  local data_to out rc=0
+  data_to=$(printf '%s' "$data" | jq --arg to "$to" '.slug = $to')
+  out=$(api_request POST /agents/register "$data_to") || rc=$?
+  if (( rc != 0 )); then
+    [[ -n "$out" ]] && printf '%s\n' "$out"
+    echo "[TeamYou] RENAMED: your owner renamed this agent from $from to $to, and registering as $to failed (above). Set TEAMYOU_AGENT_SLUG=$to in your own config and run: ty agent register --slug \"$to\"" >&2
+    exit "$rc"
+  fi
+
+  # Step 3: the result on stdout, with what was done; the one line on stderr.
+  # No config line when the slug is not configured: the key is found by the
+  # one file there is, which now carries the new name.
+  local config_line="TEAMYOU_AGENT_SLUG=$to"
+  [[ "$slug_configured" == "false" ]] && config_line=""
+  printf '%s' "$out" | jq \
+    --arg from "$from" --arg to "$to" --arg key "$key_action" --arg line "$config_line" \
+    '. + {renamed: {from: $from, to: $to, keyFile: $key, configLine: (if $line == "" then null else $line end)}}' 2>/dev/null \
+    || printf '%s\n' "$out"
+  {
+    echo "[TeamYou] RENAMED: your owner renamed this agent from $from to $to. Registered as $to: the same agent, with the same id, tasks and history, and the rename is signed off."
+    case "$key_action" in
+      moved) echo "  Moved your key file $key_from_shown to $key_to_shown." ;;
+      move_failed) echo "  Could not move $key_from_shown to $key_to_shown. Move it yourself." ;;
+      copied) echo "  Copied your key file $key_from_shown to $key_to_shown." ;;
+      kept) echo "  $key_to_shown already exists and was left alone. Check it holds this agent's key: run 'ty auth status' after the switch." ;;
+      copy_failed) echo "  Could not copy $key_from_shown to $key_to_shown. Copy it yourself before the switch." ;;
+      *) echo "  Your key does not come from $key_from_shown, so there was no key file to carry over." ;;
+    esac
+    if [[ "$slug_configured" == "true" ]]; then
+      echo "  Change this one line in your own config (this skill never edits it):"
+      echo "    TEAMYOU_AGENT_SLUG=$to"
+      if [[ "$key_action" == "copied" || "$key_action" == "kept" ]]; then
+        echo "  Once it is changed, delete $key_from_shown."
+      fi
+    else
+      echo "  TEAMYOU_AGENT_SLUG is not set, so this agent finds its key as the one key file on this machine: nothing in your config needs to change."
+      echo "  If a command or script passes --slug $from, change it to --slug $to."
+    fi
+  } >&2
 }
 
 # Show this key's registered agent (status + last-seen manifest), or null.
@@ -1830,6 +1990,25 @@ agent_ack() {
   api_request GET "/agents/ack?token=$token"
 }
 
+# Sign off the owner's slug rename (TYDEV-1348) once this agent has switched its
+# key file and TEAMYOU_AGENT_SLUG. Registering under the new slug, or acking the
+# `agent_renamed` check-in item `done`, signs off too; this is the explicit way.
+# Idempotent: with nothing pending it answers `acknowledged: 0`.
+#
+# With TEAMYOU_AGENT_SLUG set it sends `{ to: <that slug> }`, so the server
+# signs off only while that is still this agent's slug: if the owner renamed it
+# again after this agent read its steps, the answer is 409
+# rename_target_changed with the rename as it stands now, and nothing is
+# signed off for a name this agent never saw.
+agent_ack_rename() {
+  if [[ $# -gt 0 ]]; then echo "Unexpected argument: $1" >&2; exit 1; fi
+  local data=""
+  if [[ -n "${TEAMYOU_AGENT_SLUG:-}" ]]; then
+    data=$(jq -n --arg to "$TEAMYOU_AGENT_SLUG" '{to: $to}')
+  fi
+  api_request POST /agents/me/rename/ack "$data"
+}
+
 dispatch_ty_agent() {
   ty_dispatch_begin "ty agent" show_ty_agent_help "$@" && return 0
   local action=$1
@@ -1840,6 +2019,7 @@ dispatch_ty_agent() {
     whoami) agent_whoami "$@" ;;
     list) agent_list "$@" ;;
     ack) agent_ack "$@" ;;
+    ack-rename) agent_ack_rename "$@" ;;
     -h|--help) show_ty_agent_help ;;
     *) echo "Unknown ty agent action: $action" >&2; echo "Run 'teamyou.sh ty agent -h' for usage" >&2; exit 1 ;;
   esac
@@ -1862,24 +2042,86 @@ auth_status() {
   if [[ -n "$KEY_PATH" && "$KEY_PATH" == "$HOME"/* ]]; then
     shown="~${KEY_PATH:${#HOME}}"
   fi
-  me=$(api_request GET /agents/me)
+  local configured="${TEAMYOU_AGENT_SLUG:-}"
+  # Ask the server whether the configured slug is one THIS agent was renamed
+  # away from (TYDEV-1348): only it knows, at any point of a rename chain and
+  # after the rename is signed off. It never answers for another agent's slug.
+  if [[ -n "$configured" ]]; then
+    me=$(api_request GET "/agents/me?configuredSlug=$(url_encode "$configured")")
+  else
+    me=$(api_request GET /agents/me)
+  fi
   registered=$(printf '%s' "$me" | jq -r '.agent.slug // empty' 2>/dev/null)
+  # The owner's slug rename this agent has not signed off yet (TYDEV-1348).
+  local pending pending_from is_previous
+  pending=$(printf '%s' "$me" | jq -c '.agent.pendingRename // null' 2>/dev/null) || pending="null"
+  [[ -z "$pending" ]] && pending="null"
+  pending_from=$(printf '%s' "$pending" | jq -r '.from // empty' 2>/dev/null) || pending_from=""
+  is_previous=$(printf '%s' "$me" | jq -r --arg slug "$configured" \
+    'if .agent.configuredSlug.slug == $slug and .agent.configuredSlug.isPrevious == true then "true" else "false" end' 2>/dev/null) || is_previous="false"
+  # A server from before `configuredSlug` still names the oldest pending slug.
+  [[ -n "$configured" && "$pending_from" == "$configured" ]] && is_previous="true"
   jq -n \
     --arg source "$KEY_SOURCE" \
     --arg path "$shown" \
     --arg slug "${TEAMYOU_AGENT_SLUG:-}" \
     --arg registered "$registered" \
+    --argjson pending "$pending" \
+    --arg previous "$is_previous" \
     '{
       keySource: $source,
       keyPath: (if $path == "" then null else $path end),
       configuredSlug: (if $slug == "" then null else $slug end),
       keyBelongsTo: (if $registered == "" then null else $registered end),
-      matches: (if $slug == "" or $registered == "" then null else $slug == $registered end)
+      matches: (if $slug == "" or $registered == "" then null else $slug == $registered end),
+      configuredSlugIsPrevious: (if $slug == "" or $registered == "" or $slug == $registered then null else $previous == "true" end),
+      pendingRename: $pending
     }'
-  if [[ -n "${TEAMYOU_AGENT_SLUG:-}" && -n "$registered" && "$registered" != "$TEAMYOU_AGENT_SLUG" ]]; then
+  if [[ -n "$configured" && -n "$registered" && "$registered" != "$configured" ]]; then
+    # Not another agent: the configured slug is one the owner renamed THIS
+    # agent away from, whether or not the rename is signed off yet and wherever
+    # it sits in a chain. Say how to switch, not that it is impersonating.
+    if [[ "$is_previous" == "true" ]]; then
+      {
+        echo "[TeamYou] RENAMED: your owner renamed this agent from \"$configured\" to \"$registered\". It is the same agent, with the same id, tasks and history; only your local config is stale."
+        echo "  Set TEAMYOU_AGENT_SLUG=$registered in your own config (this skill never edits it)."
+        if [[ -f "$TEAMYOU_KEYS_DIR/$registered.key" ]]; then
+          echo "  Your key file ~/.teamyou/keys/$registered.key is already in place."
+        else
+          echo "  Copy ~/.teamyou/keys/$configured.key to ~/.teamyou/keys/$registered.key first (if your key lives there)."
+        fi
+        if [[ "$pending" != "null" ]]; then
+          echo "  Then sign the rename off: ty agent register --slug \"$registered\", or ty agent ack-rename."
+          echo "  Or run 'ty agent register' as you are now: the skill carries the key file over and re-registers for you."
+        fi
+      } >&2
+      exit "$EXIT_AGENT_RENAMED"
+    fi
     echo "Warning: this key belongs to \"$registered\", not \"$TEAMYOU_AGENT_SLUG\". You are acting as another agent." >&2
     exit 1
   fi
+  if [[ -n "$configured" && "$registered" == "$configured" ]]; then
+    if [[ -n "$pending_from" ]]; then
+      echo "[TeamYou] You switched from \"$pending_from\" to \"$registered\" but have not signed the rename off. Run: ty agent ack-rename" >&2
+    fi
+    auth_stale_key_hint
+  fi
+}
+
+# After a rename the old slug's key file is a copy of this one. Name any other
+# key file holding the same key, so the operator can delete the leftover.
+# Comparing contents, not names: the old slug may no longer be known here.
+auth_stale_key_hint() {
+  [[ "$KEY_SOURCE" == "agent-file" && -d "$TEAMYOU_KEYS_DIR" ]] || return 0
+  local f
+  for f in "$TEAMYOU_KEYS_DIR"/*.key; do
+    [[ -f "$f" && "$f" != "$KEY_PATH" ]] || continue
+    [[ "$(basename "$f")" == preview-* ]] && continue
+    if cmp -s "$f" "$KEY_PATH"; then
+      echo "Hint: ~/.teamyou/keys/$(basename "$f") holds this same key. If it is your old slug's file from a rename, delete it." >&2
+    fi
+  done
+  return 0
 }
 
 dispatch_ty_auth() {
@@ -3087,6 +3329,7 @@ Actions:
   list
   register [--slug <slug> | --openclaw-instance-id <instance-id>] [--kind claude|codex|perplexity|openclaw|muse|instinct|hermes|grok|chatgpt|other] [--name <display name>] [--model <model>]
   whoami
+  ack-rename
   ack <token>
 
 Environment:
