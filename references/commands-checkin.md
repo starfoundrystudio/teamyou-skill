@@ -245,7 +245,9 @@ or that may run twice at once. Checking in and acking the normal way needs none 
   it lands where the context already is.
 
 The Codex app has a ready-made way to do this, one new chat per group of related items:
-the dispatch guide `references/dispatch-codex.md`, linked from `SKILL.md`.
+the dispatch guide `references/dispatch-codex.md`, linked from `SKILL.md`. The Claude
+desktop app has its own, which sends a follow-up into the session that did the earlier
+work: `references/dispatch-claude-code.md`.
 
 ## Worked example: a note anchored to a task
 
