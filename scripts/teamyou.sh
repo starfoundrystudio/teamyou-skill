@@ -74,9 +74,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.16.0"
+SKILL_VERSION="3.16.1"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_OtW74beiNjkw"
+SKILL_VERSION_GUID="vg_pArUErPgJBQh"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -2073,10 +2073,19 @@ auth_status() {
       keyPath: (if $path == "" then null else $path end),
       configuredSlug: (if $slug == "" then null else $slug end),
       keyBelongsTo: (if $registered == "" then null else $registered end),
-      matches: (if $slug == "" or $registered == "" then null else $slug == $registered end),
+      matches: (if $slug == "" or $registered == "" then null
+        elif $source == "preview-file" and $slug != $registered then null
+        else $slug == $registered end),
       configuredSlugIsPrevious: (if $slug == "" or $registered == "" or $slug == $registered then null else $previous == "true" end),
       pendingRename: $pending
     }'
+  # A preview key is found by its own file, never by the slug, so a slug that
+  # names someone else (usually this machine's production teammate) did not
+  # pick it and is not impersonation: say so, and do not fail.
+  if [[ "$KEY_SOURCE" == "preview-file" && -n "$configured" && -n "$registered" && "$registered" != "$configured" ]]; then
+    echo "Note: TEAMYOU_AGENT_SLUG is \"$configured\", but this preview finds its key by its own file and does not use it. The preview key belongs to \"$registered\". To check it by slug, pass TEAMYOU_AGENT_SLUG=$registered on this command." >&2
+    return 0
+  fi
   if [[ -n "$configured" && -n "$registered" && "$registered" != "$configured" ]]; then
     # Not another agent: the configured slug is one the owner renamed THIS
     # agent away from, whether or not the rename is signed off yet and wherever
