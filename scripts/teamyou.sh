@@ -42,9 +42,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.15.0"
+SKILL_VERSION="3.15.1"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_nPBTJAYYxlzk"
+SKILL_VERSION_GUID="vg_EcUpSXmURlAC"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -2174,11 +2174,13 @@ resolve_document_id() {
 # authenticated (anyone signed into TeamYou). Default is public - it is what
 # "share this" means to the person asking, and the alternative is narrower.
 #
-# Requires the share scope AND the account-wide "Block agent sharing" switch
-# being off. A 403 here means one of those two is missing, not that the command
-# is wrong - the body says which: insufficient_scope is a box on the key,
-# AI_SHARE_DISABLED is one switch in Settings that covers every agent. Say which
-# one rather than retrying.
+# Requires the share scope AND the account-wide "Block agent sharing" and
+# "Block all agent updates" switches (Settings > Agent permissions) both being
+# off; both are ON for a new account. A 403 here means one of those is missing,
+# not that the command is wrong - the body says which: insufficient_scope is a
+# box on the key; AI_SHARE_DISABLED / AI_UPDATE_DISABLED is a switch that covers
+# every agent, and its body carries a `fix` line and a `settingsUrl` to relay to
+# your person as-is. Say which one rather than retrying.
 #
 # Prints the document URL and the raw-markdown URL. Hand the raw one to another
 # agent; hand the other one to a person.
