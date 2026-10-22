@@ -125,8 +125,8 @@ Shared by a team (several humans talk to you)? Create one project for the team a
 topic per member instead of step 3. Keep onboarding documents private; never share them.
 
 A registered agent on an account that already has projects or topics skips all of this.
-Every later session starts with the check-in and the task at hand, not with a sweep of
-the workspace.
+After that, check in on your schedule or when your person asks, and start each piece of
+work with the task at hand, not with a sweep of the workspace.
 
 ## Examples
 

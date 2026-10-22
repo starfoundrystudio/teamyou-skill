@@ -119,6 +119,11 @@ typo is a local error rather than a 400.
   24 hours.
 - `failed` — you tried and it did not work. Put the reason in `--reply`.
 
+Ack only after you have confirmed the action succeeded: read the command's result first,
+then ack. If it was refused (a `403`, a `409`) or errored, ack `failed` with the error in
+`--reply`, never `done`. An ack cannot be edited, so a `done` sent before the result is a
+claim that may turn out false.
+
 Acks are forward-only and idempotent: a second ack of the same id returns the same row and
 changes nothing, so re-acking after a crash is safe. Acking an expired item is accepted and
 recorded. `--reply` is short — one line for most items — and it is not a conversation: it
@@ -133,9 +138,12 @@ outcome, this client rejects it until the skill is updated — the four names ar
 Read `cadence.recommended` (an ISO-8601 duration) from the response and never poll faster
 than it. `cadence.mode` says what shape your check-in takes:
 
-- `session_start` — once when a session opens. It is not a loop.
 - `heartbeat` — once per heartbeat turn.
 - `interval` — on a timer, at `recommended` or slower.
+- Any other mode — check in when your person asks, or on a schedule you set up with them.
+
+Check-in is a scheduled pull (a `--wait` loop, below, is one), or a manual one your person
+asks for. Nothing else runs it.
 
 **Waiting for work (`--wait`).** If you can keep one background loop running, pass
 `--wait 50`: an empty first page holds the request open for up to 50 seconds and returns
@@ -161,20 +169,24 @@ substitution rule goes to **stderr**, so a redirect stays clean.
 # Append the OpenClaw HEARTBEAT.md block, or write the cron line, verbatim
 "$TY_DIR/scripts/teamyou.sh" ty checkin setup >> HEARTBEAT.md
 
-# The Claude Code SessionStart hook is an object: merge it into ~/.claude/settings.json
-"$TY_DIR/scripts/teamyou.sh" ty checkin setup --harness claude-code
+# Anywhere else: the cron line, for cron or your harness's own scheduler
+"$TY_DIR/scripts/teamyou.sh" ty checkin setup --harness cron
 ```
 
+Install only a snippet that runs on a schedule. If what `setup` prints for your harness is
+a hook rather than a schedule, do not install it: use `--harness cron`, or your harness's
+own scheduled tasks, at `cadence.recommended` or slower.
+
 Substitute `$TY_DIR` with the absolute directory holding your `SKILL.md` before you write
-the hook or the cron line to disk: neither the hook runner nor cron inherits it, and an
-unsubstituted line fails silently into a log nobody reads. Leave `$TY_DIR` as-is in the
-OpenClaw block, which you read yourself inside a turn.
+the cron line to disk: cron does not inherit it, and an unsubstituted line fails silently
+into a log nobody reads. Leave `$TY_DIR` as-is in the OpenClaw block, which you read
+yourself inside a turn.
 
 ## If you are retired
 
 When the user retires you, or revokes your last key, your key stops working and every
 call answers 403 `agent_retired`. `ty checkin` prints that notice as its RESULT on stdout,
-with `"retired": true`, and exits **0**, so a session-start hook still hands it to you;
+with `"retired": true`, and exits **0**, so a scheduled check-in still hands it to you;
 any other command exits **77**. The notice names what to remove for this account:
 
 ```json

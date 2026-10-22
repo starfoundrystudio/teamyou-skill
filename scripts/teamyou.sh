@@ -5,6 +5,25 @@
 
 set -e
 
+# A native Windows jq.exe ends every output line with CRLF (1.6 per its manual,
+# 1.8.1 measured). What the script prints straight from jq (`ty checkin setup >>
+# HEARTBEAT.md`, a cron line) then carries a \r into the file, and a bash that
+# does not strip it in `$(...)` reads values that never compare equal. --binary
+# (since jq 1.6, accepted and a no-op on non-Windows builds) turns that off, so
+# under Git Bash / MSYS / Cygwin every jq gets it. Decided from $OSTYPE, not by
+# probing jq: a process costs most of a second on Windows, and where jq lives
+# says nothing (a native jq.exe is often copied into Git's usr/bin).
+# TEAMYOU_JQ_BINARY=1|0 overrides, e.g. 0 for a jq older than 1.6.
+case "${TEAMYOU_JQ_BINARY:-}" in
+  1) jq() { command jq --binary "$@"; } ;;
+  0) ;;
+  *)
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* ]]; then
+      jq() { command jq --binary "$@"; }
+    fi
+    ;;
+esac
+
 BASE_URL="${TEAMYOU_API_URL:-https://www.teamyou.com/api/external/v1}"
 # Writable routine action types. `openclaw_command` and `execute_routine` were
 # retired (TYDEV-1175) and `checkin_item` added (TYDEV-1170); this array is the
@@ -29,9 +48,9 @@ EXIT_UPDATE_NUDGE=75
 EXIT_AGENT_RETIRED=77
 
 # Set by `ty checkin` (the pull): a retired agent's check-in is answered with the
-# retirement notice as the RESULT, on stdout, exit 0. A session-start hook adds
-# a command's stdout to the agent's context only when it exits 0, so this is the
-# one way the notice reaches an agent that checks in from a hook. Every other
+# retirement notice as the RESULT, on stdout, exit 0. A scheduler or harness that
+# runs the check-in hands its stdout to the agent only when it exits 0, so this
+# is the one way the notice reaches an agent that checks in that way. Every other
 # command treats it as an error and exits $EXIT_AGENT_RETIRED.
 RETIRED_IS_RESULT=false
 
@@ -42,9 +61,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.15.1"
+SKILL_VERSION="3.15.2"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_EcUpSXmURlAC"
+SKILL_VERSION_GUID="vg_8ZdkZ51706st"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -698,12 +717,12 @@ edges_create() {
   data=$(jq -n \
     --arg sourceTopicId "$source_topic_id" \
     --arg targetTopicId "$target_topic_id" \
-    --arg label "$label" \
+    --arg edge_label "$label" \
     --arg mirrorLabel "$mirror_label" \
     '{
       sourceTopicId: $sourceTopicId,
       targetTopicId: $targetTopicId,
-      label: $label,
+      "label": $edge_label,
       mirrorLabel: $mirrorLabel
     }')
 
@@ -748,12 +767,12 @@ edges_update() {
 
   local data
   data=$(jq -n \
-    --arg label "$label" \
+    --arg edge_label "$label" \
     --arg mirrorLabel "$mirror_label" \
     --argjson hasLabel "$has_label" \
     --argjson hasMirror "$has_mirror" \
     '{}
-    | if $hasLabel then . + {label: $label} else . end
+    | if $hasLabel then . + {"label": $edge_label} else . end
     | if $hasMirror then . + {mirrorLabel: $mirrorLabel} else . end')
 
   api_request PATCH "/edges/$edge_id" "$data"
@@ -1038,18 +1057,30 @@ work_comments_list() {
   api_request GET "/$noun/$target_id/comments$params"
 }
 
+# --reply-to may come before or after the text: check-in items once printed it
+# first, and those hints are still in agents' transcripts.
 work_comment_add() {
-  local noun=$1 target_id=$2 text=$3
-  shift 3 || true
+  local noun=$1 target_id=${2:-}
+  shift 2 || true
   require_value "${noun%s}_id" "$target_id"
-  require_value "text" "$text"
-  local reply_to=""
+  local text="" has_text=false reply_to=""
   while [[ $# -gt 0 ]]; do
     case $1 in
       --reply-to) require_flag_arg "--reply-to" $#; reply_to=$2; shift 2 ;;
-      *) echo "Unknown option: $1" >&2; exit 1 ;;
+      *)
+        # The first other argument is the text (require_value refuses a "-" one).
+        if [[ "$has_text" == true ]]; then
+          if [[ "$1" == --* ]]; then
+            echo "Unknown option: $1" >&2
+          else
+            echo "Error: unexpected argument: $1 (quote the comment text as one argument)" >&2
+          fi
+          exit 1
+        fi
+        text=$1; has_text=true; shift ;;
     esac
   done
+  require_value "text" "$text"
   local data
   data=$(jq -n --arg body "$text" --arg reply "$reply_to" \
     '{body: $body} | if $reply != "" then . + {inReplyToCommentId: $reply} else . end')
@@ -2565,10 +2596,10 @@ checkin_ref_json() {
     echo "Error: --harness is required with --url or --label (for example --harness codex-app)" >&2
     exit 1
   fi
-  jq -n --arg harness "$harness" --arg url "$url" --arg label "$label" \
+  jq -n --arg harness "$harness" --arg url "$url" --arg ref_label "$label" \
     '{harness: $harness}
      | if $url != "" then . + {url: $url} else . end
-     | if $label != "" then . + {label: $label} else . end'
+     | if $ref_label != "" then . + {"label": $ref_label} else . end'
 }
 
 checkin_claim() {
