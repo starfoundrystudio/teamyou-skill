@@ -74,9 +74,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.17.0"
+SKILL_VERSION="3.18.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_9ZJzOL4z3my3"
+SKILL_VERSION_GUID="vg_Hl1UepXKN8XM"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -2255,7 +2255,9 @@ drive_list() {
 }
 
 # Read a document's markdown. With --out FILE, write the content to FILE;
-# otherwise print the content to stdout.
+# otherwise print the content to stdout. The document's web link goes to
+# stderr, so stdout stays the exact content; a server before contract 2.28.0
+# sends no document.url and prints no link line.
 drive_pull() {
   local doc_id=$1
   shift
@@ -2278,6 +2280,11 @@ drive_pull() {
     echo "Wrote $out" >&2
   else
     printf '%s' "$response" | jq -j '.document.content // ""'
+  fi
+  local url
+  url=$(printf '%s' "$response" | jq -r '.document.url // empty')
+  if [[ -n "$url" ]]; then
+    echo "Link: $url" >&2
   fi
 }
 

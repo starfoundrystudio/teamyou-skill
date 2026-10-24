@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.17.0'
+  version: '3.18.0'
   min_codex_version: '1.0.0'
 ---
 
@@ -49,7 +49,7 @@ After each item: `ty checkin ack ITEM_ID --outcome done|skipped|deferred|failed 
 Ack only after you have confirmed the action succeeded; if it was refused or errored, ack `failed` with the error in `--reply`.
 No items means nothing to do. Never poll faster than `cadence.recommended`; one waiting `--wait` pull at a time is fine.
 `ty agent register` prints your setup; install only a part that runs on a schedule (a HEARTBEAT.md block or a cron line), never a hook.
-Unattended and behind on the skill: finish the task, report it, never self-update (see Modes).
+Behind on the skill: finish the task, then update only with your user's go-ahead or standing permission; otherwise report it (see Modes).
 
 The kinds, the outcomes and worked examples:
 [references/commands-checkin.md](references/commands-checkin.md).
@@ -88,9 +88,16 @@ section of [references/commands-agent.md](references/commands-agent.md).
 If a person is present, surface what you found and ask before anything that changes who
 can see a document or that spends their attention. If you are running unattended (a cron,
 a scheduled job, no one to answer), finish the task, report what you saw in your output,
-and never stop early, update yourself, or change how you identify yourself. Every notice
-below follows this rule. The one exception is a slug your owner renamed (`agent_renamed`):
-you follow their rename, and report the config line it needs.
+and never stop early or change how you identify yourself. Every notice below follows this
+rule. The one exception is a slug your owner renamed (`agent_renamed`): you follow their
+rename, and report the config line it needs.
+
+Updating this skill needs your user's go-ahead now, or their standing permission:
+something they told you, or set in your harness, that still applies when no one is there
+to ask (for example "keep your TeamYou skill up to date" in your instructions, memory or
+scheduled task). With it, follow the self-update procedure in
+[references/updates.md](references/updates.md). Without it, tell your user, or report it
+in your output.
 
 ## Conventions
 
@@ -112,6 +119,11 @@ you follow their rename, and report the config line it needs.
   entity per batch.
 - **Projects**: `nextAction` is computed on every read and never stored. Read it; never
   write it back.
+- **Name it, link it.** When you mention a TeamYou object to a person, make its title the
+  link text and its `url` the target, e.g. `[Q3 launch plan](https://www.teamyou.com/projects/…)`
+  (on a list, fill the `links` template; on a check-in item, `anchor.url`). Where markdown
+  doesn't render, give the title, then the url. Never show a person a bare id or a bare url;
+  ids belong only in commands.
 - **Agent Drive documents are private by default**, and writing never changes exposure.
   Share only when the human asks, with `ty agent-drive share` or `grant --email`, and tell
   them what you did and with whom. `--title` is the document's label in lists, the
@@ -171,13 +183,16 @@ stderr, and exits 1. Read stderr when the exit code is not 0; never merge it int
 JSON parser (`2>&1` corrupts the JSON on stdout).
 
 - A `[TeamYou] …` line on **stderr** after a successful call is an advisory, usually that a
-  newer skill version exists. Mention it once per session, then follow Modes: with a person
-  present, offer to update with their go-ahead; unattended, report it and carry on.
+  newer skill version exists. Mention it once per session, then follow Modes: update with
+  your user's go-ahead or standing permission; otherwise report it and carry on.
 - Exit code **75** with `"code": "client_update_nudge"` on stdout: that one call was held,
-  not run. Retry it once (or run the `ack_command` it carries), finish the task, and report
-  that an update is pending. Never loop acks.
-- A 403 `skill_update_required` is the hard floor: nothing works until the skill is
-  reinstalled from the returned `install_url`. Unattended, report it and stop cleanly.
+  not run. Retry it once (or run the `ack_command` it carries), finish the task, then update
+  with your user's go-ahead or standing permission; otherwise report that an update is
+  pending. Never loop acks.
+- A 403 `skill_update_required` is the hard floor: nothing works until a newer skill is
+  installed from the returned `install_url`. With your user's go-ahead or standing
+  permission, update and repeat the call; otherwise report it and leave TeamYou calls for
+  later.
 - `"code": "agent_retired"` on stdout (`"retired": true`; exit **0** from `ty checkin`,
   **77** from anything else): you were retired from THIS TeamYou account and your key no
   longer works. If your user gave you a new key for this account, switch to it and register

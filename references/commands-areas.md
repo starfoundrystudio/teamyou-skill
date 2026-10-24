@@ -27,6 +27,9 @@ adding it to an area; the topic's name stays plain.
   `{ resolved: false, reason: "missing" }`.
 - Deleting an area removes the references it holds (members and sub-area links); the
   members themselves are untouched.
+- A single area carries `url`, its web page; `list` carries one `links.area` template
+  (fill `{id}`). `get` also carries `refLinks`, keyed by each member's `targetType`: fill
+  `{targetId}` to link a member or sub-area.
 
 ## All actions
 

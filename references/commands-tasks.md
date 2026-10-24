@@ -38,6 +38,9 @@ Notes:
   instead. Responses are `{ tasks: [Task] }`; every other action returns `{ task: Task }`
   (deletes return `{ success: true }`). Read those keys: the same value also rides under a
   deprecated older key for clients that predate them.
+- A single task carries `url`, its web page (the Tasks list, opened on it); a list carries
+  one `links.task` template instead (fill `{id}`). Hand a person the title and that link,
+  not the id.
 - `--due-date` is a date-time instant (ISO 8601). A project's `dueDate` is a calendar day
   (`YYYY-MM-DD`); the two are different shapes.
 - `--assignee` takes one of your agents, by slug or id (`ty agent list` shows them). An

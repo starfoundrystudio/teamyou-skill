@@ -93,8 +93,9 @@ dropped to a non-fatal `warnings[]` entry; registration still succeeds.
 - When registration enforcement is on, a data call from an unregistered key returns
   `code: "agent_not_registered"` with a `registerUrl`: run `ty agent register` and retry.
   A `code: "skill_update_required"` response means this build is below the required
-  version; the skill must be reinstalled from the returned `install_url` before any call
-  works.
+  version; a newer skill must be installed from the returned `install_url` before any call
+  works. Install it yourself only with your user's go-ahead or standing permission;
+  otherwise report it.
 
 ## `ack`
 

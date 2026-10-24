@@ -16,6 +16,7 @@ is refused with a pointer to that help rather than stored as text.
 - [Details](#details)
 - [Topic edge rules](#topic-edge-rules)
 - [Named entity rule](#named-entity-rule)
+- [Web links: name it, link it](#web-links-name-it-link-it)
 - [Workflow: capturing information](#workflow-capturing-information)
 - [Workflow: filing a topic into an area](#workflow-filing-a-topic-into-an-area)
 - [Workflow: adding details with edge discovery](#workflow-adding-details-with-edge-discovery)
@@ -134,6 +135,43 @@ and venues, products) and decide whether each deserves its own topic.
 9. **Always link after find or create** with `ty graph edges-create`.
 10. **Link once per entity per batch.** Do not duplicate edges when several details
     reference the same entity.
+
+## Web links: name it, link it
+
+When you mention a TeamYou object to a person, the title is what they read and the web
+link is where it goes; ids are for commands only. The link's path is just an id, so it
+means nothing on its own: always put the title in front of it.
+
+| Where you write                                        | Form                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------ |
+| Markdown renders (chat, PR and ticket comments, a doc) | `[Q3 launch plan](https://www.teamyou.com/projects/…)` |
+| Plain text (a terminal line, an SMS, a commit message) | `Q3 launch plan: https://www.teamyou.com/projects/…`   |
+| A command you run                                      | the id, e.g. `ty projects get <id>`                    |
+
+Never show a person a bare id or a bare url. The API hands you the link, so never build
+one by hand:
+
+| Where you read it                                                            | Field                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| A single object (`get`, `create`, `update`, `complete`, `push`, `restore`)   | `url` on the object: `task.url`, `project.url`, `topic.url`, `area.url`, `document.url`, `detail.url`               |
+| A list (`list`, `details-list`, `edges-list`, a project's plan)              | one `links` block of templates, e.g. `links.task`; replace its one `{field}` placeholder with that field of the row |
+| Refs inside a project or an area (`refs`, `members`, `subAreas`, `rolledUp`) | `refLinks`, keyed by the ref's `targetType`; fill `{targetId}`                                                      |
+| A check-in item                                                              | `anchor.url`, `null` only for a routine                                                                             |
+
+The pages, on the deployment you are talking to (`https://www.teamyou.com` in production):
+
+| Object   | Page                                              | Filled from                       |
+| -------- | ------------------------------------------------- | --------------------------------- |
+| Task     | `/tasks?task={id}` (the Tasks list, opened on it) | `id`                              |
+| Project  | `/projects/{id}`                                  | `id`                              |
+| Topic    | `/topics/{id}`                                    | `id` (`linkedTopicId` on an edge) |
+| Detail   | `/topics/{topicId}` (its topic's page)            | `topicId`                         |
+| Area     | `/areas/{id}`                                     | `id`                              |
+| Document | `/agent-drive/{id}`                               | `id`                              |
+
+A link is a page for a person to open, not an API endpoint. The origin follows the
+deployment, so a preview hands out preview links; use the link the response gives you
+rather than rewriting its host.
 
 ## Workflow: capturing information
 

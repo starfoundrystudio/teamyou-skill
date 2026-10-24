@@ -36,6 +36,11 @@ teamyou.sh ty graph topics-delete TOPIC_ID
 `topics-get` returns `topic.details` and `topic.edges`; each edge carries `linkedTopicId`,
 `linkedTopicName`, `label` (from this topic's view) and `direction`.
 
+Web links: a single topic carries `url` (its page), and so does an updated detail (its
+topic's page). Lists carry one `links` template block instead: `links.topic` on
+`topics-list` (fill `{id}`), `links.detail` on `details-list` / `details-add` (fill
+`{topicId}`), and `links.topic` on `edges-list` (fill `{linkedTopicId}`).
+
 ## Details
 
 ```bash

@@ -39,6 +39,9 @@ teamyou.sh ty agent-drive search <query> [precision] [--scope mine|shared|all] [
    saving it. Read the current state off `visibility` on any list or read response. A
    shared document can also be fetched as raw markdown at `/agent-drive/{id}/raw`; that is
    how a non-TeamYou agent reads one, and `share` returns that URL for the purpose.
+   Every single-document response also carries it as `document.url`, and `list` carries
+   one `links.document` template (fill `{id}`) rather than a url per row. `pull` prints
+   the content alone on stdout and the link as one `Link: <url>` line on stderr.
 2. **Re-pushing unchanged content is free and silent.** If the file is byte-identical to
    what is stored, the write returns `200` with `"unchanged": true`, nothing is written,
    and the document keeps its place in the list. A real change returns `201` with
