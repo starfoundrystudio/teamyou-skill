@@ -2,8 +2,12 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.18.0'
+  version: '3.19.0'
   min_codex_version: '1.0.0'
+  openclaw:
+    primaryEnv: TEAMYOU_API_KEY
+    requires:
+      bins: [curl, jq]
 ---
 
 # TeamYou API Skill

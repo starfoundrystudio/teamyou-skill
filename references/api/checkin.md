@@ -32,7 +32,7 @@ Each item has two halves and they are not equal. `instruction`, `commands[]` and
 
 This endpoint is not gated on registration: an unregistered key gets a `system` item telling it to register, plus anything already addressed to that key. It does not get items addressed to an agent — there is not one yet.
 
-**Skill CLI:** `teamyou.sh ty checkin pull [--limit N] [--cursor CURSOR] [--wait SECONDS] [--pretty]`
+**Skill CLI:** `teamyou.sh ty checkin pull [--limit N] [--cursor CURSOR] [--wait SECONDS] [--pretty] | --has-work`
 
 **Parameters:**
 

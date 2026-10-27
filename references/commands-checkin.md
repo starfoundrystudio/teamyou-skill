@@ -26,6 +26,7 @@ back on the next pull.
 ```bash
 teamyou.sh ty checkin [--limit N] [--cursor CURSOR] [--wait SECONDS] [--pretty]
 teamyou.sh ty checkin pull [--limit N] [--cursor CURSOR] [--wait SECONDS] [--pretty]
+teamyou.sh ty checkin --has-work
 teamyou.sh ty checkin ack <item_id> [--outcome done|skipped|deferred|failed] [--reply "<answer>"]
 teamyou.sh ty checkin get <item_id>
 teamyou.sh ty checkin setup [--harness openclaw|claude-code|cron] [--json]
@@ -40,6 +41,19 @@ teamyou.sh ty checkin release <item_id> --token TOKEN
 `ty checkin pull` are the same request. `ty checkin -h` still prints help. `--pretty` runs
 the same document through `jq '.'` — same bytes, same exit code, just formatted; it is for
 a human at a terminal, not for a parser.
+
+`--has-work` is for a scheduler that can skip a run, so a check-in with nothing waiting
+starts no model. It pulls one item and prints nothing: exit **0** when work is waiting, **10**
+when there is none, **2** when the check failed. Skip a run only on exactly 10 and wake the
+agent on anything else, so a broken key, a retired teammate, or a skill too old to know the
+flag (it exits 1, "Unknown option") still reaches the person. The pull is idempotent, so the run
+that follows gets the same items back.
+
+```bash
+TY_DIR=/path/to/teamyou-skill
+"$TY_DIR/scripts/teamyou.sh" ty checkin --has-work
+case $? in 10) echo "nothing waiting: skip this run" ;; *) echo "run the check-in" ;; esac
+```
 
 ## The rule: instruction vs content
 
