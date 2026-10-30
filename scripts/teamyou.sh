@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.19.0"
+SKILL_VERSION="3.20.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_3yiGoDEzzTJA"
+SKILL_VERSION_GUID="vg_Ge5crmSMNIki"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -227,9 +227,11 @@ require_value() {
   # Backstop for the same class of bug ty_dispatch_begin fixes (TYDEV-1184): a
   # value that starts with "-" is a mistyped or misplaced flag, not content.
   # Refusing it beats storing it — a name written to the API is a record someone
-  # has to find and delete. No positional or option this script accepts is
+  # has to find and delete. No value a PERSON or agent writes here is
   # legitimately dash-leading (no negative numbers, no "-" stdin marker: every
   # file argument is checked with -f), so this rejects only mistakes.
+  # Server-issued opaque values are the exception: a check-in claim token could
+  # start with "-" (TYDEV-1553), so tokens go through require_token_value instead.
   case "$option_value" in
     -*)
       echo "Error: \"$option_name\" looks like a flag, not a value: '$option_value'" >&2
@@ -237,6 +239,16 @@ require_value() {
       exit 1
       ;;
   esac
+}
+
+# A token is issued by the server and passed back verbatim, so it is checked for
+# presence only: any character may lead it, "-" included (TYDEV-1553). Older
+# servers minted base64url claim tokens, about 1 in 32 of which start with "-".
+require_token_value() {
+  if [[ -z "$2" ]]; then
+    echo "Error: $1 requires a value" >&2
+    exit 1
+  fi
 }
 
 # A value-taking flag must be followed by a value (TYDEV-1252). Checks PRESENCE
@@ -1012,13 +1024,16 @@ tasks_update() {
   shift || true
   require_value "task_id" "$task_id"
 
-  local title="" description="" status="" priority="" due_date="" archived="" topic_id="" clear_topic=""
+  local title="" description="" clear_description="" base_updated_at=""
+  local status="" priority="" due_date="" archived="" topic_id="" clear_topic=""
   local project_id="" clear_project="" after="" before="" assignee="" clear_assignee=""
 
   while [[ $# -gt 0 ]]; do
     case $1 in
       --title) require_flag_arg "--title" $#; title=$2; shift 2 ;;
       --description) require_flag_arg "--description" $#; description=$2; shift 2 ;;
+      --no-description) clear_description="true"; shift ;;
+      --base-updated-at) require_flag_arg "--base-updated-at" $#; base_updated_at=$2; shift 2 ;;
       --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
       --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
       --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
@@ -1049,10 +1064,34 @@ tasks_update() {
     esac
   done
 
+  # A description write replaces the whole text, so the server refuses one
+  # that does not say which version of the task it was based on
+  # (baseUpdatedAt). Without --base-updated-at, read the task now and use its
+  # updatedAt: that guards only the moment between this read and the write.
+  # An agent that read the task earlier should pass the updatedAt it read, so
+  # a change made while it was thinking is refused rather than overwritten.
+  # The server refuses a base beside a plan move, which it cannot version-check.
+  if [[ ( -n "$description" || "$clear_description" == "true" || -n "$base_updated_at" ) \
+        && ( -n "$project_id" || "$clear_project" == "true" || -n "$after" || -n "$before" ) ]]; then
+    echo "Error: a description change (or --base-updated-at) cannot be combined with --project-id, --no-project, --after or --before; move the task in a separate update" >&2
+    exit 1
+  fi
+  if [[ ( -n "$description" || "$clear_description" == "true" ) && -z "$base_updated_at" ]]; then
+    local current
+    current=$(api_request GET "/tasks/$task_id") || exit $?
+    base_updated_at=$(printf '%s' "$current" | jq -r '.task.updatedAt // empty')
+    if [[ -z "$base_updated_at" ]]; then
+      echo "Error: could not read the updatedAt of task $task_id" >&2
+      exit 1
+    fi
+  fi
+
   local data
   data=$(jq -n \
     --arg title "$title" \
     --arg desc "$description" \
+    --arg clearDesc "$clear_description" \
+    --arg base "$base_updated_at" \
     --arg status "$status" \
     --arg priority "$priority" \
     --arg due "$due_date" \
@@ -1067,7 +1106,10 @@ tasks_update() {
     --arg clearAssignee "$clear_assignee" \
     '{}
     | if $title != "" then . + {title: $title} else . end
-    | if $desc != "" then . + {description: $desc} else . end
+    | if $desc != "" then . + {description: $desc}
+      elif $clearDesc == "true" then . + {description: null}
+      else . end
+    | if $base != "" then . + {baseUpdatedAt: $base} else . end
     | if $status != "" then . + {status: $status} else . end
     | if $priority != "" then . + {priority: $priority} else . end
     | if $due != "" then . + {dueDate: $due} else . end
@@ -2002,7 +2044,7 @@ agent_list() {
 # succeeds, re-run your original command.
 agent_ack() {
   local token=$1
-  require_value "ack token" "$token"
+  require_token_value "ack token" "$token"
   api_request GET "/agents/ack?token=$token"
 }
 
@@ -2906,7 +2948,8 @@ checkin_claim() {
   local item_id="" token="" harness="" url="" label=""
   while [[ $# -gt 0 ]]; do
     case $1 in
-      --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      --token) require_flag_arg "--token" $#; require_token_value "--token" "$2"; token=$2; shift 2 ;;
+      --token=*) token=${1#--token=}; require_token_value "--token" "$token"; shift ;;
       --harness) require_flag_arg "--harness" $#; harness=$2; shift 2 ;;
       --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
       --label) require_flag_arg "--label" $#; label=$2; shift 2 ;;
@@ -2932,6 +2975,7 @@ checkin_work() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      --token=*) token=${1#--token=}; require_token_value "--token" "$token"; shift ;;
       --state) require_flag_arg "--state" $#; state=$2; shift 2 ;;
       --harness) require_flag_arg "--harness" $#; harness=$2; shift 2 ;;
       --url) require_flag_arg "--url" $#; url=$2; shift 2 ;;
@@ -2943,7 +2987,7 @@ checkin_work() {
     esac
   done
   require_value "item id" "$item_id"
-  require_value "--token" "$token"
+  require_token_value "--token" "$token"
   case "$state" in
     ""|running|waiting_for_you) ;;
     *) echo "Error: --state must be running or waiting_for_you" >&2; exit 1 ;;
@@ -2963,6 +3007,7 @@ checkin_release() {
   while [[ $# -gt 0 ]]; do
     case $1 in
       --token) require_flag_arg "--token" $#; token=$2; shift 2 ;;
+      --token=*) token=${1#--token=}; require_token_value "--token" "$token"; shift ;;
       -*) echo "Unknown option: $1" >&2; exit 1 ;;
       *)
         if [[ -z "$item_id" ]]; then item_id=$1; shift; else echo "Unexpected argument: $1" >&2; exit 1; fi
@@ -2970,8 +3015,247 @@ checkin_release() {
     esac
   done
   require_value "item id" "$item_id"
-  require_value "--token" "$token"
+  require_token_value "--token" "$token"
   api_request POST "/checkin/items/$item_id/release" "$(jq -n --arg token "$token" '{claimToken: $token}')"
+}
+
+# ---- route: one named session per subject, with no model run (Hermes) ----
+# For a scheduler whose pre-run script may start agent sessions itself (Hermes
+# cron --script). Pulls the agenda, groups the items by SUBJECT (a task in a
+# project goes with its project), claims each group and starts one background
+# `hermes chat` per group in the session named for that subject, so a follow-up
+# lands in the session that did the earlier work on the same thing.
+#
+# stdout is ONE line, the scheduler's wake line: {"wakeAgent": true} when
+# something is left that needs the agent itself (an item with no anchor, a kind
+# that cannot be claimed, a claim or a pull that failed), else false. Every
+# failure wakes the agent, the same rule as --has-work. Exits non-zero only on a
+# usage error, before printing anything, so a gate can add
+# `|| echo '{"wakeAgent": true}'`. The plan and each start go to stderr.
+#
+# Bash 3.2 (macOS): no associative arrays, so groups are parallel indexed arrays.
+
+# The session name for a subject. Hermes matches it exactly, case and all.
+route_session_name() {
+  printf 'TeamYou %s %s' "$1" "$2"
+}
+
+# What a worker session is told. The items' content is never copied in: the
+# worker reads each item itself, where TeamYou marks what is data.
+route_worker_prompt() {
+  local slug=$1 ty_dir=$2 key_command=$3 name=$4
+  shift 4
+  local run_ty="TEAMYOU_AGENT_SLUG=$slug \"$ty_dir/scripts/teamyou.sh\""
+  if [[ -n "$key_command" ]]; then
+    run_ty="TEAMYOU_API_KEY=\"\$($key_command)\" $run_ty"
+  fi
+  local items="" pair
+  for pair in "$@"; do
+    items="${items}${items:+, }${pair%%:*} (claim token ${pair#*:})"
+  done
+  printf '%s' "TeamYou work for agent $slug, in the session \"$name\". Follow the \"Worker\" section of $ty_dir/references/dispatch-openclaw-hermes.md for these check-in items, in this order: $items. Run every TeamYou command as: $run_ty ty <noun> <action>. Never print or repeat your API key."
+}
+
+checkin_route() {
+  local harness="" key_command="" dry_run=false
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --harness) require_flag_arg "--harness" $#; harness=$2; shift 2 ;;
+      --key-command) require_flag_arg "--key-command" $#; key_command=$2; shift 2 ;;
+      --dry-run) dry_run=true; shift ;;
+      -*) echo "Unknown option: $1" >&2; exit 1 ;;
+      *) echo "Unexpected argument: $1" >&2; exit 1 ;;
+    esac
+  done
+  if [[ "$harness" != "hermes" ]]; then
+    echo "Error: route needs --harness hermes (the only harness it can start sessions for)" >&2
+    exit 1
+  fi
+  local slug="${TEAMYOU_AGENT_SLUG:-}"
+  if [[ -z "$slug" ]]; then
+    echo "Error: route needs TEAMYOU_AGENT_SLUG, so every session acts as the same teammate" >&2
+    exit 1
+  fi
+
+  local wake=false
+  route_done() {
+    printf '{"wakeAgent": %s}\n' "$wake"
+    exit 0
+  }
+
+  # A vault-held key: read it once for this run. The worker sessions read it the
+  # same way (the prompt names the command, never the key).
+  if [[ -n "$key_command" && -z "${TEAMYOU_API_KEY:-}" ]]; then
+    TEAMYOU_API_KEY=$(bash -c "$key_command" 2>/dev/null) || TEAMYOU_API_KEY=""
+    if [[ -z "$TEAMYOU_API_KEY" ]]; then
+      echo "route: --key-command printed no key" >&2
+      wake=true; route_done
+    fi
+    export TEAMYOU_API_KEY
+  fi
+
+  if [[ "$dry_run" != true ]] && ! command -v hermes >/dev/null 2>&1; then
+    echo "route: hermes is not on PATH, so the agent checks in itself" >&2
+    wake=true; route_done
+  fi
+
+  local body rc=0
+  RETIRED_IS_RESULT=true
+  body=$(api_request GET /checkin) || rc=$?
+  if (( rc != 0 )); then
+    if [[ -n "$body" ]]; then printf '%s\n' "$body" >&2; fi
+    wake=true; route_done
+  fi
+  # A retired teammate's notice has no items array: the agent must see it.
+  if ! printf '%s' "$body" | jq -e '(.items | type) == "array"' >/dev/null 2>&1; then
+    wake=true; route_done
+  fi
+
+  local ty_dir self
+  ty_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+  self="$ty_dir/scripts/teamyou.sh"
+
+  # Items a worker session failed to take last time (route-failed, written by
+  # the runner below) go to the agent this time, so an item never cycles
+  # between a failing session and a release forever. Kept to what is still on
+  # the agenda.
+  local log_dir="$HOME/.teamyou"
+  local failed_file="$log_dir/route-failed" failed=" " still_failed=""
+  if [[ -f "$failed_file" ]]; then
+    failed=" $(tr '\n' ' ' < "$failed_file") "
+  fi
+
+  # Tasks another item on this agenda is already about. A custody item (a
+  # project step that is yours) on one of them is only a reminder of work that
+  # item covers, so it is left alone rather than waking the agent.
+  local covered=" $(printf '%s' "$body" | jq -r '[.items[] | select(.kind != "custody" and .anchor.type == "todo") | .anchor.id] | join(" ")') "
+
+  # Group by subject, in agenda order. groups[i] is "type id"; members[i] is a
+  # space-separated list of item ids.
+  local groups=() members=() task_ids=() task_subjects=()
+  local id kind state atype aid step subject i found line
+  # Empty fields arrive as "-": read treats a tab as whitespace and would merge
+  # two in a row, shifting every field after an empty one.
+  while IFS=$'\t' read -r id kind state atype aid step; do
+    [[ -z "$id" ]] && continue
+    [[ "$state" == "-" ]] && state=""
+    [[ "$atype" == "-" ]] && atype=""
+    [[ "$aid" == "-" ]] && aid=""
+    if [[ -n "$state" ]]; then
+      echo "route: $id is already $state, leaving it" >&2
+      continue
+    fi
+    if [[ "$kind" == "custody" && "$step" != "-" && "$covered" == *" $step "* ]]; then
+      echo "route: $id is the step another item covers (task $step), leaving it" >&2
+      continue
+    fi
+    case "$kind" in
+      custody|notice|system|onboarding)
+        echo "route: $id ($kind) cannot be claimed, the agent handles it" >&2
+        wake=true; continue ;;
+    esac
+    if [[ "$failed" == *" $id "* ]]; then
+      echo "route: a session could not take $id last time, the agent handles it" >&2
+      still_failed="${still_failed}${id}"$'\n'
+      wake=true; continue
+    fi
+    case "$atype" in
+      todo)
+        # A task in a project goes to the project's session. Looked up once per task.
+        subject=""
+        for i in "${!task_ids[@]}"; do
+          if [[ "${task_ids[$i]}" == "$aid" ]]; then subject=${task_subjects[$i]}; fi
+        done
+        if [[ -z "$subject" ]]; then
+          local task_body project_id=""
+          task_body=$(api_request GET "/tasks/$aid" 2>/dev/null) && \
+            project_id=$(printf '%s' "$task_body" | jq -r '(.task // .todo).projectId // empty' 2>/dev/null) || project_id=""
+          if [[ -n "$project_id" ]]; then subject="project $project_id"; else subject="task $aid"; fi
+          task_ids+=("$aid"); task_subjects+=("$subject")
+        fi
+        ;;
+      project|topic|routine) subject="$atype $aid" ;;
+      drive) subject="document $aid" ;;
+      "")
+        echo "route: $id has no anchor, the agent handles it" >&2
+        wake=true; continue ;;
+      *)
+        echo "route: $id has an anchor this skill does not know ($atype), the agent handles it" >&2
+        wake=true; continue ;;
+    esac
+    found=""
+    for i in "${!groups[@]}"; do
+      if [[ "${groups[$i]}" == "$subject" ]]; then found=$i; fi
+    done
+    if [[ -z "$found" ]]; then
+      groups+=("$subject"); members+=("$id")
+    else
+      members[$found]="${members[$found]} $id"
+    fi
+  done < <(printf '%s' "$body" | jq -r '.items[] | [.id, .kind, (.work.state // "-"), (.anchor.type // "-"), (.anchor.id // "-"), (.meta.todoId // "-")] | @tsv')
+
+  if [[ "$dry_run" != true && -f "$failed_file" ]]; then
+    printf '%s' "$still_failed" > "$failed_file" 2>/dev/null || true
+  fi
+
+  local g name pairs claim_out claim_err token
+  for g in "${!groups[@]}"; do
+    name=$(route_session_name ${groups[$g]})
+    if [[ "$dry_run" == true ]]; then
+      echo "route: would send ${members[$g]} to the session \"$name\"" >&2
+      continue
+    fi
+    pairs=()
+    for id in ${members[$g]}; do
+      claim_err=$(mktemp "${TMPDIR:-/tmp}/ty-route.XXXXXX")
+      rc=0
+      # No dedupe: a claim repeated within ten minutes must get its own answer,
+      # not the replay of an earlier claim that has since been released.
+      claim_out=$(TY_NO_DEDUPE=true; checkin_claim "$id" --harness hermes --label "$name" 2>"$claim_err") || rc=$?
+      token=""
+      if (( rc == 0 )); then
+        token=$(printf '%s' "$claim_out" | jq -r '.claim.token // empty' 2>/dev/null) || token=""
+      fi
+      if [[ -n "$token" ]]; then
+        pairs+=("$id:$token")
+      elif grep -q 'checkin_item_claimed' "$claim_err" 2>/dev/null; then
+        echo "route: $id was claimed by another run, leaving it" >&2
+      else
+        echo "route: could not claim $id, the agent handles it" >&2
+        wake=true
+      fi
+      rm -f "$claim_err"
+    done
+    (( ${#pairs[@]} == 0 )) && continue
+
+    local prompt
+    prompt=$(route_worker_prompt "$slug" "$ty_dir" "$key_command" "$name" "${pairs[@]}")
+    mkdir -p "$log_dir" 2>/dev/null || true
+    # The worker runs in the background so a long task never holds the scheduler.
+    # If it fails to start or exits non-zero (the session is busy in another run:
+    # SESSION_NOT_OWNED), its claims are released and its items noted in
+    # route-failed, so the next run gives them to the agent. No -s: Hermes
+    # refuses a skill override on a session it resumes, and the prompt names the
+    # guide and the helper by path.
+    local runner='name=$1; prompt=$2; self=$3; failed_file=$4; shift 4
+echo "$(date -u +%FT%TZ) start \"$name\": $*"
+rc=0; hermes chat -c "$name" --create-if-missing -Q -q "$prompt" || rc=$?
+echo "$(date -u +%FT%TZ) end \"$name\": exit $rc"
+if [ "$rc" -ne 0 ]; then
+  for pair in "$@"; do
+    printf "%s\n" "${pair%%:*}" >> "$failed_file"
+    "$self" ty checkin release "${pair%%:*}" --token "${pair#*:}" >/dev/null || true
+  done
+fi'
+    if command -v setsid >/dev/null 2>&1; then
+      setsid nohup bash -c "$runner" teamyou-route "$name" "$prompt" "$self" "$failed_file" "${pairs[@]}" >>"$log_dir/route.log" 2>&1 </dev/null &
+    else
+      nohup bash -c "$runner" teamyou-route "$name" "$prompt" "$self" "$failed_file" "${pairs[@]}" >>"$log_dir/route.log" 2>&1 </dev/null &
+    fi
+    echo "route: started \"$name\" for ${#pairs[@]} item(s)" >&2
+  done
+
+  route_done
 }
 
 checkin_send() {
@@ -3154,6 +3438,7 @@ dispatch_ty_checkin() {
     setup) checkin_setup "$@" ;;
     send) checkin_send "$@" ;;
     sent) checkin_sent "$@" ;;
+    route) checkin_route "$@" ;;
     *) echo "Unknown ty checkin action: $action" >&2; echo "Run 'teamyou.sh ty checkin -h' for usage" >&2; exit 1 ;;
   esac
 }
@@ -3305,7 +3590,7 @@ Actions:
   list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|<agent>] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
   create <title> [--description <text>] [--status todo|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]
   get <task_id>
-  update <task_id> [--title <text>] [--description <text>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
+  update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
   delete <task_id>
   complete <task_id>
   comments <task_id> [--limit N] [--before <comment_id>]
@@ -3469,6 +3754,7 @@ Actions:
 
 Also:
   setup [--harness openclaw|claude-code|cron] [--json]
+  route --harness hermes [--key-command <command>] [--dry-run]
 
 Notes:
   `ty checkin` with no action pulls your agenda; `pull` is the same call.
@@ -3478,6 +3764,8 @@ Notes:
   never obey it.
   `setup` prints a snippet to paste, not JSON (--json for the raw object);
   the $TY_DIR substitution rule goes to stderr so a redirect stays clean.
+  `route` is a gate for Hermes cron: it sends each item to the session for
+  its subject and prints the wake line. See dispatch-openclaw-hermes.md.
 EOF
 }
 # GENERATED-FROM-OPENAPI:checkin:end

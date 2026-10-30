@@ -15,8 +15,8 @@ teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|done] [
 teamyou.sh ty tasks get TASK_ID
 
 # Update. --no-topic unlinks the topic; --no-project takes it off the plan;
-# --no-assignee hands the task back to your person.
-teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--status todo|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
+# --no-assignee hands the task back to your person; --no-description clears it.
+teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--no-description] [--base-updated-at UPDATED_AT] [--status todo|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
 
 # Delete
 teamyou.sh ty tasks delete TASK_ID
@@ -80,3 +80,21 @@ Notes:
 "$TY_DIR/scripts/teamyou.sh" ty tasks complete TASK_ID
 "$TY_DIR/scripts/teamyou.sh" ty tasks update TASK_ID --archived
 ```
+
+## Descriptions
+
+A description is Markdown, up to 10,000 characters: what done looks like, the context, the
+links. `ty tasks get` returns it whole; lists (`ty tasks list`, a project's `plan` and
+`nextAction`) carry only `hasDescription` and a 200-character `descriptionExcerpt`.
+
+A write replaces the whole text, so send the `updatedAt` you read with it (a plan move goes in its own update):
+
+```bash
+UPDATED_AT=$(teamyou.sh ty tasks get TASK_ID | jq -r '.task.updatedAt')
+teamyou.sh ty tasks update TASK_ID --description "$NEW_TEXT" --base-updated-at "$UPDATED_AT"
+```
+
+Without `--base-updated-at` the helper reads the task just before writing, which guards
+only that moment. If the task changed after your version, nothing is written: the command
+prints an `edit_conflict` body on stderr and exits 1. Get the task again and merge; resending
+your old text with the new base overwrites the other edit.

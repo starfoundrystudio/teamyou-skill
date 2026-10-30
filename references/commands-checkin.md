@@ -267,7 +267,10 @@ or that may run twice at once. Checking in and acking the normal way needs none 
 The Codex app has a ready-made way to do this, one new chat per group of related items:
 the dispatch guide `references/dispatch-codex.md`, linked from `SKILL.md`. The Claude
 desktop app has its own, which sends a follow-up into the session that did the earlier
-work: `references/dispatch-claude-code.md`.
+work: `references/dispatch-claude-code.md`. OpenClaw and Hermes name a session for each
+task or project and send its items there: `references/dispatch-openclaw-hermes.md`. On
+Hermes, `ty checkin route --harness hermes` does that from the hourly job's gate script,
+without running the model.
 
 ## Worked example: a note anchored to a task
 

@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.19.0'
+  version: '3.20.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -61,6 +61,8 @@ In the Codex app, a scheduled check-in can hand each piece of work to a new chat
 [references/dispatch-codex.md](references/dispatch-codex.md).
 In the Claude desktop app, a scheduled check-in sends follow-ups back to the session that
 did the work: [references/dispatch-claude-code.md](references/dispatch-claude-code.md).
+In OpenClaw and Hermes, each piece of work goes to a session named for its task or project:
+[references/dispatch-openclaw-hermes.md](references/dispatch-openclaw-hermes.md).
 
 ## Register
 
@@ -123,6 +125,12 @@ in your output.
   entity per batch.
 - **Projects**: `nextAction` is computed on every read and never stored. Read it; never
   write it back.
+- **A task's title is a line; its description is the rest.** Put what done looks like, the
+  context and the links in `--description` (Markdown, up to 10,000 characters; longer goes
+  in an Agent Drive document linked from it). Lists carry only `descriptionExcerpt`; read
+  the whole text with `ty tasks get`. A description write replaces the whole text, so pass
+  the `updatedAt` you read as `--base-updated-at`. If someone changed the task since, the
+  write is refused with `edit_conflict`: get the task again and merge, never resend.
 - **Name it, link it.** When you mention a TeamYou object to a person, make its title the
   link text and its `url` the target, e.g. `[Q3 launch plan](https://www.teamyou.com/projects/…)`
   (on a list, fill the `links` template; on a check-in item, `anchor.url`). Where markdown
