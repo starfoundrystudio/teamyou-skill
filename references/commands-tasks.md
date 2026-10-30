@@ -3,6 +3,14 @@
 Task management: priorities, due dates, status, archiving, and optional links to a topic
 or a project plan.
 
+## Contents
+
+- [Commands](#commands)
+- [Examples](#examples)
+- [Descriptions](#descriptions)
+
+## Commands
+
 ```bash
 # List tasks with filters
 teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|AGENT] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
@@ -29,6 +37,9 @@ teamyou.sh ty tasks comments TASK_ID [--limit N] [--before COMMENT_ID]
 teamyou.sh ty tasks comment TASK_ID "TEXT" [--reply-to COMMENT_ID]
 teamyou.sh ty tasks follow TASK_ID
 teamyou.sh ty tasks unfollow TASK_ID
+
+# Who changed it and what, newest first. --cursor is the page before's cursor.
+teamyou.sh ty tasks history TASK_ID [--limit N] [--cursor CURSOR]
 ```
 
 Notes:
@@ -41,6 +52,11 @@ Notes:
 - A single task carries `url`, its web page (the Tasks list, opened on it); a list carries
   one `links.task` template instead (fill `{id}`). Hand a person the title and that link,
   not the id.
+- Every task carries `createdBy`, `lastEditedBy` and `lastEditedAt` (an agent is
+  `{ type: "agent", agentId, name, via }`, your person `{ type: "owner" }`, `null` before
+  history was recorded). `history` returns `{ items, cursor, hasMore }`; each item says what
+  happened (`action`), to what (`entity`), which fields changed (`changes`: short values as
+  `from` / `to`, long text only `{ changed, bytes }`) and who did it (`actor`).
 - `--due-date` is a date-time instant (ISO 8601). A project's `dueDate` is a calendar day
   (`YYYY-MM-DD`); the two are different shapes.
 - `--assignee` takes one of your agents, by slug or id (`ty agent list` shows them). An

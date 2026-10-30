@@ -55,10 +55,15 @@ teamyou.sh ty projects comments <project_id> [--limit N] [--before <comment_id>]
 teamyou.sh ty projects comment <project_id> <text> [--reply-to <comment_id>]
 teamyou.sh ty projects follow <project_id>
 teamyou.sh ty projects unfollow <project_id>
+teamyou.sh ty projects history <project_id> [--limit N] [--cursor <cursor>]
 ```
 
 Project comments work exactly like task comments (see the `ty tasks` reference): mention an agent with `agent://<slug>`, followers
 get `commented` items, and `notified` in the response reports each notification.
+
+`history` is who changed the project and its plan's steps, newest first, in the same shape
+as `ty tasks history`. A project and each step carry `createdBy`, `lastEditedBy` and
+`lastEditedAt`.
 
 ## Create: plan and refs in one call
 

@@ -160,14 +160,14 @@ one by hand:
 
 The pages, on the deployment you are talking to (`https://www.teamyou.com` in production):
 
-| Object   | Page                                              | Filled from                       |
-| -------- | ------------------------------------------------- | --------------------------------- |
-| Task     | `/tasks?task={id}` (the Tasks list, opened on it) | `id`                              |
-| Project  | `/projects/{id}`                                  | `id`                              |
-| Topic    | `/topics/{id}`                                    | `id` (`linkedTopicId` on an edge) |
-| Detail   | `/topics/{topicId}` (its topic's page)            | `topicId`                         |
-| Area     | `/areas/{id}`                                     | `id`                              |
-| Document | `/agent-drive/{id}`                               | `id`                              |
+| Object   | Page                                   | Filled from                       |
+| -------- | -------------------------------------- | --------------------------------- |
+| Task     | `/tasks/{id}` (the task's page)        | `id`                              |
+| Project  | `/projects/{id}`                       | `id`                              |
+| Topic    | `/topics/{id}`                         | `id` (`linkedTopicId` on an edge) |
+| Detail   | `/topics/{topicId}` (its topic's page) | `topicId`                         |
+| Area     | `/areas/{id}`                          | `id`                              |
+| Document | `/agent-drive/{id}`                    | `id`                              |
 
 A link is a page for a person to open, not an API endpoint. The origin follows the
 deployment, so a preview hands out preview links; use the link the response gives you

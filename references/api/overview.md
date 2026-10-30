@@ -107,16 +107,16 @@ One file per domain, each self-contained, beside this one under `references/api/
 
 | File | Covers | Operations |
 | --- | --- | --- |
-| `topics.md` | Topics | 5 |
+| `topics.md` | Topics | 6 |
 | `details.md` | Details | 4 |
 | `edges.md` | Edges | 4 |
 | `search.md` | Search | 4 |
-| `tasks.md` | Tasks | 10 |
-| `projects.md` | Projects | 13 |
+| `tasks.md` | Tasks | 11 |
+| `projects.md` | Projects | 14 |
 | `areas.md` | Areas | 8 |
 | `agents.md` | Agents | 5 |
 | `agent-drive.md` | Agent Drive | 9 |
 | `preferences.md` | Preferences | 1 |
 | `checkin.md` | Check-in | 8 |
 | `agent-drive-deprecated.md` | Agent Drive (deprecated paths) | 8 |
-| `tasks-deprecated.md` | Tasks (deprecated paths) | 10 |
+| `tasks-deprecated.md` | Tasks (deprecated paths) | 11 |

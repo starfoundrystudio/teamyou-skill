@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.20.0"
+SKILL_VERSION="3.21.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_Ge5crmSMNIki"
+SKILL_VERSION_GUID="vg_DuueGoGiOJux"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -905,6 +905,7 @@ dispatch_ty_graph() {
     topics-get) topics_get "$@" ;;
     topics-update) topics_update "$@" ;;
     topics-delete) topics_delete "$@" ;;
+    topics-history) entity_history topics "$@" ;;
     details-list) details_list "$@" ;;
     details-add) details_add "$@" ;;
     edges-link) edges_link "$@" ;;
@@ -1165,6 +1166,28 @@ work_comments_list() {
   api_request GET "/$noun/$target_id/comments$params"
 }
 
+# Who changed a task, project or topic and what, newest first (API 2.34.0). A
+# project's includes its plan's steps; a topic's, its details. --cursor is the
+# page before's `cursor`.
+entity_history() {
+  local noun=$1 target_id=${2:-}
+  shift 2 || true
+  require_value "${noun%s}_id" "$target_id"
+  local params=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --limit) require_flag_arg "--limit" $#; params="${params}&limit=$2"; shift 2 ;;
+      --cursor) require_flag_arg "--cursor" $#; params="${params}&cursor=$(url_encode "$2")"; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+  params="${params#&}"
+  if [[ -n "$params" ]]; then
+    params="?$params"
+  fi
+  api_request GET "/$noun/$(url_encode "$target_id")/history$params"
+}
+
 # --reply-to may come before or after the text: check-in items once printed it
 # first, and those hints are still in agents' transcripts.
 work_comment_add() {
@@ -1214,6 +1237,7 @@ dispatch_ty_tasks() {
     delete) tasks_delete "$@" ;;
     complete) tasks_complete "$@" ;;
     comments) work_comments_list tasks "$@" ;;
+    history) entity_history tasks "$@" ;;
     comment) work_comment_add tasks "$@" ;;
     follow) work_follow tasks PUT "$@" ;;
     unfollow) work_follow tasks DELETE "$@" ;;
@@ -1633,6 +1657,7 @@ dispatch_ty_projects() {
     refs-remove) projects_refs_remove "$@" ;;
     refs-reorder) projects_refs_reorder "$@" ;;
     comments) work_comments_list projects "$@" ;;
+    history) entity_history projects "$@" ;;
     comment) work_comment_add projects "$@" ;;
     follow) work_follow projects PUT "$@" ;;
     unfollow) work_follow projects DELETE "$@" ;;
@@ -3558,6 +3583,7 @@ Topics:
   topics-get <topic_id>
   topics-update <topic_id> [--name <text>] [--description <text>] [--summary <text>]
   topics-delete <topic_id>
+  topics-history <topic_id> [--limit N] [--cursor <cursor>]
 
 Details:
   details-list <topic_id>
@@ -3593,6 +3619,7 @@ Actions:
   update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
   delete <task_id>
   complete <task_id>
+  history <task_id> [--limit N] [--cursor <cursor>]
   comments <task_id> [--limit N] [--before <comment_id>]
   comment <task_id> <text> [--reply-to <comment_id>]
   follow <task_id>
@@ -3614,6 +3641,7 @@ Actions:
   get <project_id>
   update <project_id> [--name <text>] [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--no-goal] [--no-waiting-on] [--no-notes] [--no-due-date]
   delete <project_id>
+  history <project_id> [--limit N] [--cursor <cursor>]
   comments <project_id> [--limit N] [--before <comment_id>]
   comment <project_id> <text> [--reply-to <comment_id>]
   follow <project_id>

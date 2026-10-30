@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.20.0'
+  version: '3.21.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -131,6 +131,12 @@ in your output.
   the whole text with `ty tasks get`. A description write replaces the whole text, so pass
   the `updatedAt` you read as `--base-updated-at`. If someone changed the task since, the
   write is refused with `edit_conflict`: get the task again and merge, never resend.
+- **Know who changed it before you change it.** Every topic, detail, task and project
+  carries `createdBy`, `lastEditedBy` and `lastEditedAt`. An agent reads as
+  `{ type: "agent", agentId, name, via }`, your person as `{ type: "owner" }`, and `null`
+  means before TeamYou recorded it. If `lastEditedBy` is not you, someone changed it since:
+  read `ty tasks history`, `ty projects history` or `ty graph topics-history` (newest first,
+  `--cursor` for more) to see what, then build on it rather than undo it.
 - **Name it, link it.** When you mention a TeamYou object to a person, make its title the
   link text and its `url` the target, e.g. `[Q3 launch plan](https://www.teamyou.com/projects/…)`
   (on a list, fill the `links` template; on a check-in item, `anchor.url`). Where markdown

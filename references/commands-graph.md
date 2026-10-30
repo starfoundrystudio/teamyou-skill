@@ -31,10 +31,18 @@ teamyou.sh ty graph topics-update TOPIC_ID [--name "NAME"] [--description "DESC"
 
 # Delete a topic (and its details)
 teamyou.sh ty graph topics-delete TOPIC_ID
+
+# Who changed the topic and its details, newest first
+teamyou.sh ty graph topics-history TOPIC_ID [--limit N] [--cursor CURSOR]
 ```
 
 `topics-get` returns `topic.details` and `topic.edges`; each edge carries `linkedTopicId`,
 `linkedTopicName`, `label` (from this topic's view) and `direction`.
+
+A topic and each detail carry `createdBy`, `lastEditedBy` and `lastEditedAt`. `topics-history`
+returns `{ items, cursor, hasMore }` in the same shape as `ty tasks history`; a detail's entry
+has no title (`entity.title: null`) and never its text, only `{ changed, bytes }`. A
+regenerated summary, outline or consolidated details is never anyone's edit.
 
 Web links: a single topic carries `url` (its page), and so does an updated detail (its
 topic's page). Lists carry one `links` template block instead: `links.topic` on
