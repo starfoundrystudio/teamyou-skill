@@ -70,7 +70,7 @@ DEPRECATED PATH — use `POST /tasks` instead. Identical behaviour, identical re
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string (date-time) | no |  |
 | `topicId` | string | no | len 1..∞ |
-| `projectId` | string | no | File the new task into this project's plan. — len 1..∞ |
+| `projectId` | string | no | File the new task into this project's plan: the project's id or its key (e.g. `PROJ-2`). — len 1..∞ |
 | `position` | PlanPosition | no | Where in the plan to place it (requires projectId); omit to append. |
 | `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. 403 assignment_refused (reason escalation), creating nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
 
@@ -96,7 +96,7 @@ DEPRECATED PATH — use `GET /tasks/{id}` instead. Identical behaviour, identica
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Responses:**
 
@@ -118,7 +118,7 @@ DEPRECATED PATH — use `PUT /tasks/{id}` instead. Identical behaviour, identica
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Request body:**
 
@@ -132,7 +132,7 @@ DEPRECATED PATH — use `PUT /tasks/{id}` instead. Identical behaviour, identica
 | `dueDate` | string \| null | no |  |
 | `isArchived` | boolean | no |  |
 | `topicId` | string \| null | no | len 1..∞ |
-| `projectId` | string \| null | no | Assign/move into this project; null removes from its project. — len 1..∞ |
+| `projectId` | string \| null | no | Assign or move into this project (the project's id or its key (e.g. `PROJ-2`)); null removes it from its project. — len 1..∞ |
 | `position` | PlanPosition | no | Reorder within the project plan; with projectId, positions on assign. |
 | `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
 
@@ -157,7 +157,7 @@ DEPRECATED PATH — use `DELETE /tasks/{id}` instead. Identical behaviour, ident
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Responses:**
 
@@ -179,7 +179,7 @@ DEPRECATED PATH — use `POST /tasks/{id}/complete` instead. Identical behaviour
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Responses:**
 
@@ -200,7 +200,7 @@ DEPRECATED PATH — use `GET /tasks/{id}/history` instead. Identical behaviour, 
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 - `limit` (query) — integer
 - `cursor` (query) — string — The cursor of the page before: entries older than it.
 
@@ -224,7 +224,7 @@ DEPRECATED PATH — use `GET /tasks/{id}/comments` instead. Identical behaviour,
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 - `limit` (query) — integer
 - `before` (query) — string — Comments older than this id.
 
@@ -248,7 +248,7 @@ DEPRECATED PATH — use `POST /tasks/{id}/comments` instead. Identical behaviour
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 - `Idempotency-Key` (header) — string — Makes this write safe to retry: a repeat with the same key and the same body returns the first result (with `Idempotent-Replayed: true`) and writes nothing. One key per logical write, 1–100 printable characters. A key you choose lasts 24 hours; one starting with `auto:` (derived from the request content) lasts 10 minutes. A failed write keeps nothing, so retrying it really retries. Scoped to your API key.
 
 **Request body:**
@@ -280,7 +280,7 @@ DEPRECATED PATH — use `PUT /tasks/{id}/following` instead. Identical behaviour
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Responses:**
 
@@ -302,7 +302,7 @@ DEPRECATED PATH — use `DELETE /tasks/{id}/following` instead. Identical behavi
 
 **Parameters:**
 
-- `id` (path, required) — string — Task id
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
 
 **Responses:**
 

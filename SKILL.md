@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
 metadata:
-  version: '3.21.0'
+  version: '3.22.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -107,6 +107,8 @@ in your output.
 
 ## Conventions
 
+- **Report what the API returned, not your plan**: write acks, replies and summaries from the responses; a refused call is not done, so say it was refused and why. **Work for a project lives on it**: link its documents (`ty projects doc-push`, or `ty projects refs-add` for one that exists), link what you make back to its source (a project ref or a topic edge), and put progress on the step (`ty tasks comment`).
+- **Ask before saving contact details or sensitive personal information** (phone, address, email, health, money, family) unless your person asked you to; where it goes is your call. If they are not in your chat, ask on the step with `user://owner` and leave it out until they answer; with no one to ask, leave it out and say so in your report.
 - **Topic names are plain and reusable**: 1–3 words, not too broad ("Life"), not too
   specific ("Tuesday gym session"). Search before creating; prefer adding details to an
   existing topic. A person's topic is their full name. Older topics may carry an `Area:`
@@ -124,7 +126,7 @@ in your output.
   ongoing plans). A person who will reappear gets a topic automatically. Link once per
   entity per batch.
 - **Projects**: `nextAction` is computed on every read and never stored. Read it; never
-  write it back.
+  write it back. Every task and project has a key (`TASK-12`, `PROJ-2`) beside its `id`, and every command that takes the id takes the key too.
 - **A task's title is a line; its description is the rest.** Put what done looks like, the
   context and the links in `--description` (Markdown, up to 10,000 characters; longer goes
   in an Agent Drive document linked from it). Lists carry only `descriptionExcerpt`; read
@@ -160,6 +162,7 @@ Long form, the entity mapping and worked workflows:
 | `tasks`       | `create`, `list --status todo`                      | [commands-tasks.md](references/commands-tasks.md)             |
 | `projects`    | `create` (one call: plan + refs), `get`, `doc-push` | [commands-projects.md](references/commands-projects.md)       |
 | `areas`       | `refs-add` (file a topic), `get --depth full`       | [commands-areas.md](references/commands-areas.md)             |
+| `proposals`   | `create`, `get` (guided-review onboarding only)     | [commands-proposals.md](references/commands-proposals.md)     |
 | `agent-drive` | `push`, `search`                                    | [commands-agent-drive.md](references/commands-agent-drive.md) |
 | `agent`       | `register`, `whoami`, `ack-rename`                  | [commands-agent.md](references/commands-agent.md)             |
 | `checkin`     | `ty checkin`, `ack ID --outcome …`                  | [commands-checkin.md](references/commands-checkin.md)         |

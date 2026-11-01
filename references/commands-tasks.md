@@ -20,7 +20,7 @@ teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medi
 teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
 
 # Get a task
-teamyou.sh ty tasks get TASK_ID
+teamyou.sh ty tasks get TASK-12
 
 # Update. --no-topic unlinks the topic; --no-project takes it off the plan;
 # --no-assignee hands the task back to your person; --no-description clears it.
@@ -44,6 +44,10 @@ teamyou.sh ty tasks history TASK_ID [--limit N] [--cursor CURSOR]
 
 Notes:
 
+- **A task is named by its `id` or its `key`** (`TASK-12`, unique in your account and
+  never reused): every `TASK_ID` above, including `--after` and `--before`, takes either,
+  and `--project-id` takes a project's id or key (`PROJ-2`). Responses always echo the
+  `id`, with the `key` beside it on every task.
 - `list` returns up to `--limit` tasks, default 100, maximum 100 (a larger value is a 400).
   Archived tasks are excluded unless you pass `--archived`, which lists archived tasks
   instead. Responses are `{ tasks: [Task] }`; every other action returns `{ task: Task }`
@@ -90,10 +94,10 @@ Notes:
   --topic-id TOPIC_ID
 
 # Add a step to the end of a project plan
-"$TY_DIR/scripts/teamyou.sh" ty tasks create "Book the inspector" --project-id PROJECT_ID
+"$TY_DIR/scripts/teamyou.sh" ty tasks create "Book the inspector" --project-id PROJ-2
 
 # Complete, then archive
-"$TY_DIR/scripts/teamyou.sh" ty tasks complete TASK_ID
+"$TY_DIR/scripts/teamyou.sh" ty tasks complete TASK-12
 "$TY_DIR/scripts/teamyou.sh" ty tasks update TASK_ID --archived
 ```
 

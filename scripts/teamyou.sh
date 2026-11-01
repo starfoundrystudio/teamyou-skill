@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.21.0"
+SKILL_VERSION="3.22.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_DuueGoGiOJux"
+SKILL_VERSION_GUID="vg_h9Vt5utMakKk"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -611,6 +611,19 @@ api_request() {
   if [[ "$replayed" == true ]]; then
     # "Note:", not "[TeamYou]": a [TeamYou] line is the skill-update advisory.
     printf 'Note: %s\n' "This is the result of an earlier identical request; nothing was written again. To repeat it on purpose, run the command again with --no-dedupe." >&2
+  fi
+  # A top-level server `hint` (TYDEV-1372: e.g. an Agent Drive write that
+  # filed the document nowhere) goes to stderr as a "Note:" line too, so
+  # `| jq` keeps stdout pure JSON and the agent still sees it. Same guards as
+  # the notice above: object body, string field, whitespace collapsed to one
+  # line, best-effort and never fatal. The field stays in the JSON on stdout.
+  local hint=""
+  hint=$(printf '%s' "$body" | jq -r '
+    if type == "object" and (.hint | type) == "string"
+    then (.hint | gsub("[[:space:]]+"; " ")) else empty end
+  ' 2>/dev/null) || hint=""
+  if [[ -n "$hint" ]]; then
+    printf 'Note: %s\n' "$hint" >&2
   fi
 
   echo "$body"
@@ -1431,6 +1444,23 @@ projects_get() {
   api_request GET "/projects/$project_id"
 }
 
+# Create this account's project from a server-side template, its agent steps
+# assigned to this agent. One per template per account: a repeat returns the
+# existing project (created: false), so it is safe to run again.
+projects_from_template() {
+  local template_key=$1
+  require_value "template_key" "$template_key"
+  shift
+  if [[ $# -gt 0 ]]; then
+    echo "Unknown option: $1" >&2
+    exit 1
+  fi
+
+  local data
+  data=$(jq -n --arg key "$template_key" '{templateKey: $key}')
+  api_request POST /projects/from-template "$data"
+}
+
 projects_update() {
   local project_id=$1
   shift
@@ -1543,9 +1573,14 @@ projects_refs_add() {
 # Document paths are GLOBAL per user, not scoped to a project: re-pushing a path
 # replaces that one document everywhere it is referenced. A bare basename would
 # therefore make two projects pushing "notes.md" share (and silently overwrite)
-# a single document, so the default path is namespaced by project id:
-# projects/<project_id>/<basename>. --path overrides it verbatim -- pass the
-# same --path from two projects only when you WANT one shared document.
+# a single document, so without --path the helper sends only the basename as
+# `document.filename` and the SERVER picks the project's folder (contract
+# 2.42.0, numbered work keys decision 7): projects/<key>/<basename>, unless the
+# project's older id-named folder projects/<project_id>/ already holds that
+# file, in which case it is updated there. The helper cannot make that choice
+# itself, because it cannot see which folder already holds the file, and the
+# project argument may be a key or an id. --path overrides it verbatim -- pass
+# the same --path from two projects only when you WANT one shared document.
 #
 # Document title defaults to the file's basename (or, when --path is given, to
 # that path). --ref-title sets an optional label on the reference itself.
@@ -1575,12 +1610,7 @@ projects_doc_push() {
   fi
   local base
   base=$(basename "$file")
-  if [[ -z "$path" ]]; then
-    # Namespace the default so same-named files pushed from different projects
-    # do not collide on one global document (see the note above).
-    path="projects/$project_id/$base"
-    if [[ -z "$title" ]]; then title="$base"; fi
-  fi
+  if [[ -z "$path" && -z "$title" ]]; then title="$base"; fi
   if [[ -z "$title" ]]; then title="$path"; fi
 
   # --rawfile reads the file verbatim (preserving trailing newlines) so the
@@ -1594,7 +1624,11 @@ projects_doc_push() {
     --arg refTitle "$ref_title" \
     --arg after "$after" \
     --arg before "$before" \
-    '{document: {title: $title, path: $path, content: $content}}
+    --arg filename "$base" \
+    '{document: (
+        {title: $title, content: $content}
+        + if $path != "" then {path: $path} else {filename: $filename} end
+      )}
     | if $refTitle != "" then . + {title: $refTitle} else . end
     | if ($after != "" or $before != "") then . + {position: (
         {}
@@ -1649,6 +1683,7 @@ dispatch_ty_projects() {
   case "$action" in
     list) projects_list "$@" ;;
     create) projects_create "$@" ;;
+    from-template) projects_from_template "$@" ;;
     get) projects_get "$@" ;;
     update) projects_update "$@" ;;
     delete) projects_delete "$@" ;;
@@ -1878,6 +1913,83 @@ dispatch_ty_areas() {
     refs-reorder) areas_refs_reorder "$@" ;;
     -h|--help) show_ty_areas_help ;;
     *) echo "Unknown ty areas action: $action" >&2; echo "Run 'teamyou.sh ty areas -h' for usage" >&2; exit 1 ;;
+  esac
+}
+
+# ============================================================================
+# ty proposals — your first-pass proposal, reviewed in TeamYou (TYDEV-1381)
+# ============================================================================
+
+# The request body for `ty proposals create|update`: one JSON object, read from
+# <file> and compacted. Checked as JSON here so a bad file fails before any
+# request; the shape is the server's to check. The person approves a proposal
+# in TeamYou, never through this script.
+proposals_read_body() {
+  local file=$1
+  require_value "file" "$file"
+  if [[ ! -f "$file" ]]; then
+    echo "Error: file not found: $file" >&2
+    exit 1
+  fi
+  local body
+  if ! body=$(jq -c . "$file" 2>/dev/null); then
+    echo "Error: not valid JSON: $file" >&2
+    exit 1
+  fi
+  local body_type
+  if ! body_type=$(jq -rs 'if length == 1 then .[0] | type else "many" end' <<<"$body" 2>/dev/null) \
+    || [[ "$body_type" != "object" ]]; then
+    echo "Error: the proposal file must hold one JSON object: $file" >&2
+    exit 1
+  fi
+  printf '%s' "$body"
+}
+
+proposals_create() {
+  local file=${1:-}
+  require_value "file" "$file"
+  shift
+  if [[ $# -gt 0 ]]; then
+    echo "Unknown option: $1" >&2
+    exit 1
+  fi
+  local data
+  data=$(proposals_read_body "$file")
+  api_request POST /proposals "$data"
+}
+
+proposals_get() {
+  local proposal_id=${1:-}
+  require_value "proposal_id" "$proposal_id"
+  api_request GET "/proposals/$proposal_id"
+}
+
+proposals_update() {
+  local proposal_id=${1:-}
+  local file=${2:-}
+  require_value "proposal_id" "$proposal_id"
+  require_value "file" "$file"
+  shift 2
+  if [[ $# -gt 0 ]]; then
+    echo "Unknown option: $1" >&2
+    exit 1
+  fi
+  local data
+  data=$(proposals_read_body "$file")
+  api_request PUT "/proposals/$proposal_id" "$data"
+}
+
+dispatch_ty_proposals() {
+  ty_dispatch_begin "ty proposals" show_ty_proposals_help "$@" && return 0
+  local action=$1
+  shift
+
+  case "$action" in
+    create) proposals_create "$@" ;;
+    get) proposals_get "$@" ;;
+    update) proposals_update "$@" ;;
+    -h|--help) show_ty_proposals_help ;;
+    *) echo "Unknown ty proposals action: $action" >&2; echo "Run 'teamyou.sh ty proposals -h' for usage" >&2; exit 1 ;;
   esac
 }
 
@@ -3482,6 +3594,7 @@ dispatch_ty() {
     tasks) dispatch_ty_tasks "$@" ;;
     projects) dispatch_ty_projects "$@" ;;
     areas) dispatch_ty_areas "$@" ;;
+    proposals) dispatch_ty_proposals "$@" ;;
     agent) dispatch_ty_agent "$@" ;;
     auth) dispatch_ty_auth "$@" ;;
     checkin) dispatch_ty_checkin "$@" ;;
@@ -3556,6 +3669,7 @@ Services:
   tasks          Task management
   projects       Projects, plans, and references
   areas          Cross-pillar contexts (membership + rollup)
+  proposals      Your proposal for your person to review in TeamYou
   agent          Agent registration and identity
   auth           Where your API key comes from (ty auth status)
   checkin        Your agenda - pull, ack, and the setup snippet
@@ -3624,6 +3738,10 @@ Actions:
   comment <task_id> <text> [--reply-to <comment_id>]
   follow <task_id>
   unfollow <task_id>
+
+Notes:
+  Every <task_id> (and --after/--before) takes a task's id or its key, e.g.
+  ty tasks get TASK-12; --project-id takes a project's id or key (PROJ-2).
 EOF
 }
 # GENERATED-FROM-OPENAPI:tasks:end
@@ -3638,6 +3756,7 @@ Usage: teamyou.sh ty projects <action> [arguments]
 Actions:
   list [--status active|waiting|done|archived] [--limit N]
   create <name> [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--task <title>]... [--ref <type>:<value>]... [--from-json <file>]
+  from-template <template_key>
   get <project_id>
   update <project_id> [--name <text>] [--goal <text>] [--status active|waiting|done|archived] [--waiting-on <text>] [--notes <text>] [--due-date <YYYY-MM-DD>] [--no-goal] [--no-waiting-on] [--no-notes] [--no-due-date]
   delete <project_id>
@@ -3652,6 +3771,9 @@ Actions:
   refs-remove <project_id> <ref_id>
 
 Notes:
+  Every <project_id> takes a project's id or its key, e.g. ty projects get
+  PROJ-2, and --target-id and --ref take a task's or project's key too.
+
   create --task/--ref/--from-json build the project and its children in ONE
   atomic call: flag order is the order, and a failure anywhere creates nothing.
   It is create-only - there is no upsert or dedupe, so running it twice makes
@@ -3662,9 +3784,12 @@ Notes:
   dueDate/topicId that have no flag.
 
   doc-push document paths are GLOBAL per user, not per project: re-pushing a
-  path replaces that one document everywhere it is referenced. --path defaults
-  to projects/<project_id>/<basename> so same-named files in different projects
-  do not collide; pass the same --path from two projects only to share one doc.
+  path replaces that one document everywhere it is referenced. Without --path
+  the server files it in the project's folder, projects/<key>/<basename>, or
+  in its older projects/<project_id>/ folder when that already holds the file,
+  so a re-push updates the same doc and same-named files in different
+  projects do not collide. Pass the same --path from two projects only to
+  share one doc.
 EOF
 }
 # GENERATED-FROM-OPENAPI:projects:end
@@ -3688,6 +3813,29 @@ Actions:
 EOF
 }
 # GENERATED-FROM-OPENAPI:areas:end
+
+# GENERATED-FROM-OPENAPI:proposals:start
+show_ty_proposals_help() {
+  cat <<'EOF'
+TeamYou Proposals (ty proposals)
+
+Usage: teamyou.sh ty proposals <action> [arguments]
+
+Actions:
+  create <file>
+  get <proposal_id>
+  update <proposal_id> <file>
+
+Notes:
+  <file> holds the JSON request body: {"playback": ..., "items": [...]}.
+  Only your person approves a proposal, on its review page (reviewUrl):
+  give them the link, wait for them to say done, then get it. Say what you
+  leave out in the chat; leftOut is refused and never stored.
+  Available only on deployments running the guided-review onboarding
+  preview.
+EOF
+}
+# GENERATED-FROM-OPENAPI:proposals:end
 
 # GENERATED-FROM-OPENAPI:agent:start
 show_ty_agent_help() {

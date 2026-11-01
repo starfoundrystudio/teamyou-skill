@@ -11,6 +11,7 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 
 - [List projects](#list-projects)
 - [Create a project, optionally with its plan and references](#create-a-project-optionally-with-its-plan-and-references)
+- [Create a project from a template](#create-a-project-from-a-template)
 - [Get a project (one-call hydrate)](#get-a-project-one-call-hydrate)
 - [Update a project](#update-a-project)
 - [Delete a project](#delete-a-project)
@@ -86,6 +87,35 @@ Creates a project. Optional `tasks` and `refs` arrays let one call stand up a wh
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
 
+### Create a project from a template
+
+```http
+POST /projects/from-template
+```
+
+Creates this account's project from a server-side template: its name, goal, notes and ordered steps, with every step meant for an agent assigned to YOU (this key recorded as the assigner) and every step for your person left unassigned. Do your steps in order, until one needs your person, asking on that step with `user://owner` if they aren't in your chat. Available only on deployments running an onboarding preview; elsewhere it answers 404. `get-to-know-you` is accepted only on deployments running the guided, interview or guided-review onboarding preview; anywhere else it is a 400, as an unknown key is. One project per template per account (per agent, for a per-agent template): if the account already has one, it is returned as it is now with `created: false` and status 200, and nothing is written, so a retry is always safe. Needs a key registered to an agent (409 agent_not_registered otherwise: register, then call again); 403 assignment_refused (reason escalation), creating nothing, when your agent's other live keys hold scopes this key does not. The response is the hydrated project, as `projects get` returns it, under `project`.
+
+**Skill CLI:** `teamyou.sh ty projects from-template <template_key>`
+
+**Request body:**
+
+| Field | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `templateKey` | `run-a-ramble` \| `get-to-know-you` | yes | The template to create the project from. Only templates an agent may create are accepted; any other key is a 400. |
+
+**Responses:**
+
+- `200` — The account already had a project from this template; it is returned unchanged.
+- `201` — Created the project from the template.
+- `400` — Validation error — invalid body, query, or path param (code: validation_error or invalid_json). `details` carries Zod field errors; PATCH /edges also adds `formErrors`.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `402` — Payment required — product_limit_exceeded: the request would pass a limit of the account’s plan, and nothing was written. `detail` is a sentence to relay to the person; `upgradeUrl` (when a higher plan is better for this limit) is a page they can open to upgrade, and `settingsUrl` shows their plan and usage. Not retryable until the person upgrades or frees room.
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED / AI_SHARE_DISABLED (an account-wide block in Settings > Agent permissions is on; carries requiredPreference, blockedPreferences (every preference in the way; a sharing call can be blocked by two), fix (one line to relay to your person as-is: which switch or switches to turn off, and where) and settingsUrl (the link to those switches) - NOT retryable until the person turns the block off). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `409` — Conflict — agent_not_registered: this key has no registered agent, and a template's agent steps are assigned to the agent that creates it. Nothing was created. Carries registerUrl: register (`ty agent register`), then call again.
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+
 ### Get a project (one-call hydrate)
 
 ```http
@@ -98,7 +128,7 @@ Returns the project with its ordered task plan, hydrated references, a progress 
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Responses:**
 
@@ -120,7 +150,7 @@ PUT /projects/{id}
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Request body:**
 
@@ -156,7 +186,7 @@ Orphans the project's tasks (nulls their projectId + plan position) and cascades
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Responses:**
 
@@ -180,7 +210,7 @@ Who changed the project and its plan’s steps and what, newest first: the same 
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 - `limit` (query) — integer
 - `cursor` (query) — string — The cursor of the page before: entries older than it.
 
@@ -204,7 +234,7 @@ GET /projects/{id}/comments
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 - `limit` (query) — integer
 - `before` (query) — string — Comments older than this id.
 
@@ -230,7 +260,7 @@ Mention an agent with agent://<id-or-slug>: it gets a mentioned item (wakes it).
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 - `Idempotency-Key` (header) — string — Makes this write safe to retry: a repeat with the same key and the same body returns the first result (with `Idempotent-Replayed: true`) and writes nothing. One key per logical write, 1–100 printable characters. A key you choose lasts 24 hours; one starting with `auto:` (derived from the request content) lasts 10 minutes. A failed write keeps nothing, so retrying it really retries. Scoped to your API key.
 
 **Request body:**
@@ -262,7 +292,7 @@ PUT /projects/{id}/following
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Responses:**
 
@@ -286,7 +316,7 @@ Stops commented items for this thread until you follow again.
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Responses:**
 
@@ -304,13 +334,13 @@ Stops commented items for this thread until you follow again.
 POST /projects/{id}/refs
 ```
 
-Links a project to a topic/task/project/doc/url. Re-adding an existing target returns 409. `area`/`entity` targets are rejected (D5).
+Links a project to a topic/task/project/doc/url. Re-adding an existing target returns 409. `area`/`entity` targets are rejected (D5). Gated by aiUpdateEnabled (403 AI_UPDATE_DISABLED when the person has blocked agent updates), except, on deployments running the live-setup onboarding preview, on a project with an open step assigned to you (to the agent your key belongs to): there you may add references even when agent updates are blocked.
 
 **Skill CLI:** `teamyou.sh ty projects refs-add <project_id> --target-type topic|task|project|doc|url [--target-id <id>] [--url <url>] [--title <text>] [--after <ref_id>] [--before <ref_id>]`
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Request body:**
 
@@ -336,19 +366,19 @@ Links a project to a topic/task/project/doc/url. Re-adding an existing target re
 POST /projects/{id}/documents
 ```
 
-Writes a markdown document to Agent Drive and links it to the project as a `doc` reference in one call. Requires BOTH `agent-drive:write` (the document) and `work:write` (the reference) — it is the one operation that composes two writes, and a key missing either gets a 403 before anything is written. Builds on the Agent Drive upsert, and document paths are GLOBAL per user rather than scoped to a project: re-posting the same path replaces that one document everywhere it is referenced, so namespace the path (e.g. `projects/<project-id>/<file>`) when two projects push files with the same local name. Idempotent — 201 when the reference is created, 200 when the document was already linked (never 409). Reads always resolve the reference display name from the live document title, so the reference is indistinguishable from one added with refs-add. Returns document metadata only (no content echo). Deleting the document later leaves the reference dangling and reads report it unresolved.
+Writes a markdown document to Agent Drive and links it to the project as a `doc` reference in one call. Requires BOTH `agent-drive:write` (the document) and `work:write` (the reference) — it is the one operation that composes two writes, and a key missing either gets a 403 before anything is written. Builds on the Agent Drive upsert, and document paths are GLOBAL per user rather than scoped to a project: re-posting the same path replaces that one document everywhere it is referenced, so namespace the path (e.g. `projects/<project-id>/<file>`) when two projects push files with the same local name. Idempotent — 201 when the reference is created, 200 when the document was already linked (never 409). Reads always resolve the reference display name from the live document title, so the reference is indistinguishable from one added with refs-add. Returns document metadata only (no content echo). Deleting the document later leaves the reference dangling and reads report it unresolved. Gated by aiUpdateEnabled (403 AI_UPDATE_DISABLED when the person has blocked agent updates), except, on deployments running the live-setup onboarding preview, on a project with an open step assigned to you (to the agent your key belongs to): there you may push a new document, or replace one this project already references, even when agent updates are blocked; replacing a document the project does not reference still needs updates allowed.
 
 **Skill CLI:** `teamyou.sh ty projects doc-push <project_id> <file> [--path <path>] [--title <text>] [--ref-title <text>] [--after <ref_id>] [--before <ref_id>]`
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 
 **Request body:**
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `document` | WriteDocumentRequest | yes | The markdown document to write (upsert-by-path), identical to the POST /agent-drive body. |
+| `document` | ProjectDocumentWriteRequest | yes | The markdown document to write (upsert-by-path): the POST /agent-drive body, except that `filename` may replace `path`. |
 | `title` | string \| null | no | Optional label stored on the REFERENCE (not the document) and echoed back as `ref.title`. It does NOT change the hydrated `display`, which always resolves from the live document title (falling back to its path). Defaults to null. — len 0..1000 |
 | `position` | RefPosition | no | Where in the project's ref list to place it; omit to append. |
 
@@ -373,7 +403,7 @@ PATCH /projects/{id}/refs/{refId}
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 - `refId` (path, required) — string — Reference id
 
 **Request body:**
@@ -403,7 +433,7 @@ DELETE /projects/{id}/refs/{refId}
 
 **Parameters:**
 
-- `id` (path, required) — string — Project id
+- `id` (path, required) — string — Project: the project's id or its key (e.g. `PROJ-2`).
 - `refId` (path, required) — string — Reference id
 
 **Responses:**

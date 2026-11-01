@@ -143,7 +143,8 @@ changes nothing, so re-acking after a crash is safe. Acking an expired item is a
 recorded. `--reply` is short — one line for most items — and it is not a conversation: it
 is surfaced to whoever sent the item, and nothing comes back to you. When a **person** sent
 a `note`, the reply is your answer to them, so make it complete: if they asked what you are
-working on, say so; if they asked for something, say what you did and where it is. Up to
+working on, say so; if they asked for something, say what you did and where it is. Write it
+from what your commands returned, not from your plan: name anything that was refused. Up to
 2,000 characters; the client refuses more before sending. If the server ever adds a fifth
 outcome, this client rejects it until the skill is updated — the four names are part of the standing instruction in `SKILL.md`.
 

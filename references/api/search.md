@@ -121,7 +121,7 @@ An id that does not exist, belongs to someone else, or names a document the call
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `type` | `topic` \| `detail` \| `task` \| `project` \| `area` \| `document` | yes |  |
-| `id` | string | yes | len 1..200 |
+| `id` | string | yes | The item's id. A task or project may be given by its key (e.g. `TASK-12`, `PROJ-2`). — len 1..200 |
 | `limit` | integer | no | 1..50, default `20` |
 
 **Responses:**
