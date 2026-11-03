@@ -101,15 +101,18 @@ teamyou.sh ty projects create "Cabin expansion" \
 ## `--from-json`
 
 `--from-json <file>` is client-side only: the file is merged **over** the flags and posted
-as the same JSON body. Use it for what the flags cannot express, such as per-task `status`,
-`priority`, `dueDate` or `topicId`, or a long plan you would rather write as data.
+as the same JSON body. Use it for what the flags cannot express, such as per-task
+`description`, `assigneeAgentId`, `status`, `priority`, `dueDate` or `topicId`, or a long plan
+you would rather write as data.
 
 ```bash
 cat > cabin.json <<'EOF'
 {
   "goal": "Permits filed and framing started",
   "tasks": [
-    { "title": "Call the county about setbacks", "priority": "high" },
+    { "title": "Call the county about setbacks", "priority": "high", "assigneeAgentId": "claude-code",
+      "description": "Done when the setback distances are written down here." },
+    { "title": "Choose the framer", "description": "Your person picks from the quotes." },
     { "title": "Get three framing quotes", "dueDate": "2026-10-01T17:00:00Z" }
   ],
   "refs": [
@@ -121,8 +124,14 @@ teamyou.sh ty projects create "Cabin expansion" --from-json cabin.json
 ```
 
 The body shape is the `POST /projects` request: `tasks[]` are `{ title, description?,
-status?, priority?, dueDate?, topicId? }` and `refs[]` are **flat** target objects (below).
-A ref to a task is `{ "targetType": "task", "targetId": "..." }`.
+assigneeAgentId?, status?, priority?, dueDate?, topicId? }` and `refs[]` are **flat** target
+objects (below). A ref to a task is `{ "targetType": "task", "targetId": "..." }`.
+
+`assigneeAgentId` is an agent's id or slug; leave it out, or send null, for a step your person
+holds. A refused assignee (403 `assignment_refused`) or an unknown one (400) creates nothing.
+The response's `assignments` says, in plan order, whether each step's `assigned` item was queued
+or refused. An agent only sees that item when the step is next, and a step that is not next
+does not count toward the notification limits, so a long plan uses one notification for its first step.
 
 `todos` is the deprecated spelling of `tasks` and is still accepted, alone or beside
 `tasks`. Sending both with different values is a 400 `validation_error` naming both fields,
@@ -205,15 +214,15 @@ calls the plan `tasks`, every read returns it as `plan`. A task reference reads 
 `targetType: "todo"`, the stored spelling of `task`, in every response. Every `Project`
 and `Task` carries `key` (`PROJ-2`, `TASK-12`) beside `id`.
 
-| Command                    | Shape                                                                                                                                                                                                                                                                                                                    |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list`                     | `{ projects: [Project], links }` (empty array when there are none); `links.project` is the web-page template, fill `{id}`                                                                                                                                                                                                |
-| `create`, `get`            | `{ project: Project, links, refLinks }` hydrated: `url` (its web page), `plan[]` (Task, in order), `refs[]` (each with `display`), `progress` (`total`, `done`, `percent`), `nextAction` (Task or null), `lastActivityAt`; `links.task` links a plan row (fill `{id}`), `refLinks[targetType]` a ref (fill `{targetId}`) |
-| `from-template`            | `{ result: "project", project: Project, created }`: `project` hydrated as on `get`, with its `url`; `created` is false when the account already had it                                                                                                                                                                   |
-| `update`                   | `{ project: Project }` (not hydrated), with its `url`                                                                                                                                                                                                                                                                    |
-| `refs-add`, `refs-reorder` | `{ ref: ... }` with `id`, `targetType`, `display`                                                                                                                                                                                                                                                                        |
-| `doc-push`                 | `{ document, ref, url }`: the document's metadata (`id`, `path`, `title`, `visibility`, and `url`, its web page), the hydrated reference, and the document's URL again at the top level, which is what to hand a person who wants to read it                                                                             |
-| `delete`, `refs-remove`    | `{ success: true }`                                                                                                                                                                                                                                                                                                      |
+| Command                    | Shape                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`                     | `{ projects: [Project], links }` (empty array when there are none); `links.project` is the web-page template, fill `{key}`                                                                                                                                                                                                |
+| `create`, `get`            | `{ project: Project, links, refLinks }` hydrated: `url` (its web page), `plan[]` (Task, in order), `refs[]` (each with `display`), `progress` (`total`, `done`, `percent`), `nextAction` (Task or null), `lastActivityAt`; `links.task` links a plan row (fill `{key}`), `refLinks[targetType]` a ref (fill `{targetId}`) |
+| `from-template`            | `{ result: "project", project: Project, created }`: `project` hydrated as on `get`, with its `url`; `created` is false when the account already had it                                                                                                                                                                    |
+| `update`                   | `{ project: Project }` (not hydrated), with its `url`                                                                                                                                                                                                                                                                     |
+| `refs-add`, `refs-reorder` | `{ ref: ... }` with `id`, `targetType`, `display`                                                                                                                                                                                                                                                                         |
+| `doc-push`                 | `{ document, ref, url }`: the document's metadata (`id`, `path`, `title`, `visibility`, and `url`, its web page), the hydrated reference, and the document's URL again at the top level, which is what to hand a person who wants to read it                                                                              |
+| `delete`, `refs-remove`    | `{ success: true }`                                                                                                                                                                                                                                                                                                       |
 
 ```bash
 PROJECT_ID=$("$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin permit" --task "Call the county" | jq -r '.project.id')

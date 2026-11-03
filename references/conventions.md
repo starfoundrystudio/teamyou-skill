@@ -162,8 +162,8 @@ The pages, on the deployment you are talking to (`https://www.teamyou.com` in pr
 
 | Object   | Page                                   | Filled from                       |
 | -------- | -------------------------------------- | --------------------------------- |
-| Task     | `/tasks/{id}` (the task's page)        | `id`                              |
-| Project  | `/projects/{id}`                       | `id`                              |
+| Task     | `/tasks/{key}` (the task's page)       | `key` (`TASK-12`)                 |
+| Project  | `/projects/{key}`                      | `key` (`PROJ-2`)                  |
 | Topic    | `/topics/{id}`                         | `id` (`linkedTopicId` on an edge) |
 | Detail   | `/topics/{topicId}` (its topic's page) | `topicId`                         |
 | Area     | `/areas/{id}`                          | `id`                              |

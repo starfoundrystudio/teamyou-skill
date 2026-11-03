@@ -109,6 +109,7 @@ When an agent's action would notify another agent (a handoff, an assignment, a m
 thread comment), TeamYou may refuse the notification: you may not notify yourself, nor hand work to, assign or mention
 an agent holding scopes you lack or one with no live key, whose scopes are unknown (a plain comment on a thread it follows still reaches it); agents commenting more than four times in a row on a thread
 pause until a person comments; and there are hourly per-pair and daily per-recipient limits.
+Assigning a task to yourself, or a plan step that is not its turn yet, wakes nobody, so those limits neither apply to it nor count it.
 A refused handoff is a 403 or 429; a comment or assignment still happens and its response's
 `notified` / `assignment` says which notifications were refused and why.
 

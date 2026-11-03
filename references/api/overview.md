@@ -113,6 +113,7 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `search.md` | Search | 4 |
 | `tasks.md` | Tasks | 11 |
 | `projects.md` | Projects | 15 |
+| `history.md` | History | 1 |
 | `proposals.md` | Proposals | 3 |
 | `areas.md` | Areas | 8 |
 | `agents.md` | Agents | 5 |

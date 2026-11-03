@@ -68,13 +68,17 @@ POST /search/details
 POST /search/all
 ```
 
-Use this before acting on a vague question about what the user already has: one ranked list across topics, details, tasks, projects, areas and Agent Drive documents.
+Use this before acting on a vague question about what the user already has, and whenever they ask about something they expect you to know; if it misses, try other words.
+
+One ranked list across topics, details, tasks, projects, areas and Agent Drive documents. Never tell the user you do not know something without looking here first.
 
 Each type is searched by meaning (vector), words (full-text) and spelling (trigram). The matches of each arm are pooled across types and fused ONCE by weighted RRF with a small recency boost, so a hit that matched on several arms outranks a single-arm hit of any type. Projects and areas have no vector arm. `score` is comparable within one response only; `methods` names the arms that matched.
 
 Each result carries its `type`, an absolute `url` and `structure` - where it sits: a detail's topic, a task's project and topic, a project's areas, a document's projects. Follow `structure` to the neighbours of a hit rather than searching again.
 
 `counts` is the number of candidates per type BEFORE the cut to `limit`. One store failing does not fail the request: the failed type is named in `warnings` (`store_unavailable`) and is absent from `counts` and `results`. Nor does an unavailable query embedding: every type is then searched by words and spelling only, with an `embedding_unavailable` warning.
+
+A query that is a task or project key (`TASK-12`, `PROJ-2`, any case) puts that item first, whichever `orderBy`, followed by whatever else matches the text; a key that names nothing of yours changes nothing.
 
 `types` narrows the search; omit it for every type. `scope` (mine | shared | all) applies to documents only. An empty `query` is allowed only with `orderBy: recency`, and then lists the most recently updated items with `score` null and `methods` empty; an empty query with `relevance` is a 400. With a non-empty query, `orderBy: recency` selects candidates by relevance and returns them newest first. The per-type endpoints (`/search/topics`, `/search/details`, `/search/documents`) remain for type-specific fields and filters such as `pathPrefix` and `where`.
 

@@ -1,8 +1,8 @@
 ---
 name: teamyou
-description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked.
+description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked. Also use it at the start of a session to recall what the team knows, and before finishing a task to save what lasts.
 metadata:
-  version: '3.22.0'
+  version: '3.23.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -55,14 +55,17 @@ No items means nothing to do. Never poll faster than `cadence.recommended`; one 
 `ty agent register` prints your setup; install only a part that runs on a schedule (a HEARTBEAT.md block or a cron line), never a hook.
 Behind on the skill: finish the task, then update only with your user's go-ahead or standing permission; otherwise report it (see Modes).
 
-The kinds, the outcomes and worked examples:
-[references/commands-checkin.md](references/commands-checkin.md).
-In the Codex app, a scheduled check-in can hand each piece of work to a new chat:
-[references/dispatch-codex.md](references/dispatch-codex.md).
-In the Claude desktop app, a scheduled check-in sends follow-ups back to the session that
-did the work: [references/dispatch-claude-code.md](references/dispatch-claude-code.md).
-In OpenClaw and Hermes, each piece of work goes to a session named for its task or project:
-[references/dispatch-openclaw-hermes.md](references/dispatch-openclaw-hermes.md).
+The kinds, the outcomes and worked examples: [references/commands-checkin.md](references/commands-checkin.md).
+In the Codex app, a scheduled check-in can hand each piece of work to a new chat: [references/dispatch-codex.md](references/dispatch-codex.md).
+In the Claude desktop app, a scheduled check-in sends follow-ups back to the session that did the work: [references/dispatch-claude-code.md](references/dispatch-claude-code.md).
+In OpenClaw and Hermes, each piece of work goes to a session named for its task or project: [references/dispatch-openclaw-hermes.md](references/dispatch-openclaw-hermes.md).
+
+## Memory
+
+With your person's OK, keep TeamYou's working agreement in your standing instructions: `ty brief`
+once at the start of a session, `ty search "<words>"` before you ask or answer about what they
+expect you to know, save what lasts before your final reply. The block, where it goes and how to
+save well: [references/memory.md](references/memory.md). A brief is not a check-in: it does no work.
 
 ## Register
 
@@ -270,13 +273,8 @@ Reads 100/min, writes 60/min, search 30/min, all 1000/hour; the helper exits on 
 back off and retry after `X-RateLimit-Reset` seconds rather than hammering.
 The HTTP contract, one file per domain (each self-contained; a Contents block once over
 100 lines):
-[overview](references/api/overview.md) · [topics](references/api/topics.md) ·
-[details](references/api/details.md) · [edges](references/api/edges.md) ·
-[search](references/api/search.md) · [tasks](references/api/tasks.md) ·
-[projects](references/api/projects.md) · [areas](references/api/areas.md) ·
-[agents](references/api/agents.md) · [checkin](references/api/checkin.md) ·
-[agent-drive](references/api/agent-drive.md) ·
-[preferences](references/api/preferences.md) ·
-[agent-drive (deprecated paths)](references/api/agent-drive-deprecated.md) ·
-[tasks (deprecated paths)](references/api/tasks-deprecated.md).
+[overview](references/api/overview.md) · [topics](references/api/topics.md) · [details](references/api/details.md) · [edges](references/api/edges.md) · [search](references/api/search.md) ·
+[history](references/api/history.md) · [tasks](references/api/tasks.md) · [projects](references/api/projects.md) · [areas](references/api/areas.md) · [agents](references/api/agents.md) ·
+[checkin](references/api/checkin.md) · [agent-drive](references/api/agent-drive.md) · [preferences](references/api/preferences.md) ·
+[agent-drive (deprecated paths)](references/api/agent-drive-deprecated.md) · [tasks (deprecated paths)](references/api/tasks-deprecated.md).
 

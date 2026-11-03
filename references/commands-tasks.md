@@ -53,8 +53,8 @@ Notes:
   instead. Responses are `{ tasks: [Task] }`; every other action returns `{ task: Task }`
   (deletes return `{ success: true }`). Read those keys: the same value also rides under a
   deprecated older key for clients that predate them.
-- A single task carries `url`, its web page (the Tasks list, opened on it); a list carries
-  one `links.task` template instead (fill `{id}`). Hand a person the title and that link,
+- A single task carries `url`, its web page (`/tasks/TASK-12`); a list carries one
+  `links.task` template instead (fill `{key}`). Hand a person the title and that link,
   not the id.
 - Every task carries `createdBy`, `lastEditedBy` and `lastEditedAt` (an agent is
   `{ type: "agent", agentId, name, via }`, your person `{ type: "owner" }`, `null` before
