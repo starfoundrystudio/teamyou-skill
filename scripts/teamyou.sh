@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.24.0"
+SKILL_VERSION="3.24.1"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_dwfwI2oZBukr"
+SKILL_VERSION_GUID="vg_BRwjCiUqSloc"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -3130,7 +3130,9 @@ BRIEF_TEXT_JQ='
 # The composed JSON, from each section's raw body (empty when it failed).
 BRIEF_COMPOSE_JQ='
   def parsed($s): if $s == "" then null else ($s | fromjson) end;
-  def fill($template; $id): if $template == null then null else ($template | sub("\\{id\\}"; $id)) end;
+  # A links template names the one field to put in it: {key} for a project or task, {id} for
+  # others. Fill in whichever it names, so the server can change the field without breaking this.
+  def fill($template; $item): if $template == null then null else ($template | sub("\\{(?<field>[A-Za-z]+)\\}"; ($item[.field] // $item.id | tostring))) end;
   ($me.agent.id // null) as $self
   | (parsed($active)) as $a
   | (parsed($waiting)) as $w
@@ -3144,15 +3146,15 @@ BRIEF_COMPOSE_JQ='
       changes: (if $c == null then null else $c.items end),
       moreChanges: (if $c == null then false else $c.hasMore end),
       activeProjects: (if $a == null then null else
-        [$a.projects[] | {id, name, url: fill($a.links.project; .id)}] end),
+        [$a.projects[] | {id, name, url: fill($a.links.project; .)}] end),
       waitingProjects: (if $w == null then null else
-        [$w.projects[] | {id, name, waitingOn, url: fill($w.links.project; .id)}] end),
+        [$w.projects[] | {id, name, waitingOn, url: fill($w.links.project; .)}] end),
       dueSoon: (if $t == null then null else
         [$t.tasks[]
           | select(.dueDate != null)
           | select(.assigneeAgentId == null or .assigneeAgentId != $self)
           | select((.dueDate | sub("\\.[0-9]+Z$"; "Z") | fromdate) < (now + 7 * 86400))
-          | {id, title, dueDate, url: fill($t.links.task; .id)}]
+          | {id, title, dueDate, url: fill($t.links.task; .)}]
         | sort_by(.dueDate) | .[0:5] end),
       relevant: (parsed($relevant) | if . == null then null else [.results[] | {type, title, url}] end),
       areas: (parsed($areas) | if . == null then null else [.areas[] | .name] end),
