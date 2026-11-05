@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.23.1"
+SKILL_VERSION="3.24.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_Y6zROuIo4Ca8"
+SKILL_VERSION_GUID="vg_dwfwI2oZBukr"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -450,6 +450,40 @@ api_write() {
   api_request "$@"
 }
 
+# ---- Short rate limits --------------------------------------------------------
+#
+# A burst that goes over a per-minute limit is not something the agent should
+# have to handle, so api_request waits it out and sends the request again. A
+# refused request did not run: the limit is checked before any work, and a refused
+# keyed write stores no result, so sending it again cannot duplicate anything.
+#
+# Every per-minute window ends within 60 seconds, so 60 covers all of them and
+# leaves out the hourly limit's long waits, which exit as any other error does.
+# The hourly limit's last minute also falls inside it, and that wait is short too.
+RATE_LIMIT_MAX_RETRIES=2
+RATE_LIMIT_MAX_WAIT_SECONDS=60
+
+# The seconds to wait before sending this response's request again. Returns 1 for
+# anything that should not be retried: only `rate_limit_exceeded` is. A check-in
+# refusal is also a 429, but its limit does not clear in a minute, and a 429 from
+# anything else has no wait this helper can trust. The wait comes from the
+# `retryAfter` in the body, which the server sets from the same value as the
+# Retry-After header (lib/rate-limit.test.ts pins that), so no call has to keep
+# its headers just in case. A wait that is missing or malformed is not retried.
+rate_limit_wait_seconds() {
+  local http_code=$1 body=$2 seconds
+  [[ "$http_code" == "429" ]] || return 1
+  seconds=$(printf '%s' "$body" | jq -r '
+    if type == "object" and .code == "rate_limit_exceeded"
+    then (.retryAfter // empty) else empty end
+  ' 2>/dev/null) || return 1
+  # At most 4 digits, so bash arithmetic cannot overflow; base 10, so 08 is valid.
+  [[ "$seconds" =~ ^[0-9]{1,4}$ ]] || return 1
+  seconds=$((10#$seconds))
+  (( seconds <= RATE_LIMIT_MAX_WAIT_SECONDS )) || return 1
+  printf '%s' "$seconds"
+}
+
 # Make an authenticated API request.
 #
 # This is the single transport chokepoint for the whole skill, so the UTF-8
@@ -509,8 +543,8 @@ api_request() {
   #
   # curl cannot re-read STDIN, so do NOT add -L/--location or --retry to
   # curl_args while the body arrives this way — a redirect or a retry would
-  # resend an empty body. Use a temp file with `--data-binary @file` if that
-  # ever becomes a requirement.
+  # resend an empty body. A retry belongs in the loop below, which pipes $data
+  # to a new curl on every attempt.
   local idem_key="" hdr_file=""
   if [[ "$IDEMPOTENT_WRITE" == true ]]; then
     idem_key=$(idempotency_key_for "$method" "$path" "$data")
@@ -521,13 +555,28 @@ api_request() {
     curl_args+=(-H "Idempotency-Key: $idem_key" -D "$hdr_file")
   fi
 
-  local response rc=0
-  if [[ -n "$data" ]]; then
-    curl_args+=(--data-binary @-)
-    response=$(printf '%s' "$data" | curl "${curl_args[@]}") || rc=$?
-  else
-    response=$(curl "${curl_args[@]}") || rc=$?
-  fi
+  [[ -n "$data" ]] && curl_args+=(--data-binary @-)
+
+  local response rc http_code body wait_seconds retries=0
+  while true; do
+    rc=0
+    if [[ -n "$data" ]]; then
+      response=$(printf '%s' "$data" | curl "${curl_args[@]}") || rc=$?
+    else
+      response=$(curl "${curl_args[@]}") || rc=$?
+    fi
+    (( rc == 0 )) || break
+    http_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | sed '$d')
+
+    (( retries < RATE_LIMIT_MAX_RETRIES )) || break
+    wait_seconds=$(rate_limit_wait_seconds "$http_code" "$body") || break
+    retries=$((retries + 1))
+    printf 'Note: TeamYou rate limit reached, so this request did not run. Waiting %s seconds, then sending it again (retry %s of %s).\n' \
+      "$wait_seconds" "$retries" "$RATE_LIMIT_MAX_RETRIES" >&2
+    sleep "$wait_seconds"
+  done
+
   local replayed=false
   if [[ -n "$hdr_file" ]]; then
     grep -qi '^idempotent-replayed:[[:space:]]*true' "$hdr_file" 2>/dev/null && replayed=true
@@ -535,11 +584,6 @@ api_request() {
   fi
   # A failed curl ends the command with curl's own exit code, as it always has.
   (( rc != 0 )) && exit "$rc"
-
-  local http_code
-  local body
-  http_code=$(echo "$response" | tail -n1)
-  body=$(echo "$response" | sed '$d')
 
   if [[ "$http_code" -ge 400 ]]; then
     # The capability-aware nag (TYDEV-975/987) is a 403 whose `code` is
@@ -3005,8 +3049,9 @@ brief_read() {
   err=$(mktemp "${TMPDIR:-/tmp}/ty-brief.XXXXXX")
   out=$(api_request "$@" 2>"$err") || rc=$?
   if (( rc != 0 )); then
+    # Without the "Note:" line a rate-limit retry leaves, stderr is the JSON body.
     if [[ ! -f "$BRIEF_GATE_DIR/rc" ]] && { (( rc == EXIT_UPDATE_NUDGE || rc == EXIT_AGENT_RETIRED || rc == EXIT_AGENT_RENAMED )) || \
-      jq -e --argjson codes "$BRIEF_GATE_CODES" 'type == "object" and ((.code // "") as $c | $codes | index($c))' "$err" >/dev/null 2>&1; }; then
+      grep -v '^Note: ' "$err" | jq -e --argjson codes "$BRIEF_GATE_CODES" 'type == "object" and ((.code // "") as $c | $codes | index($c))' >/dev/null 2>&1; }; then
       printf '%s' "$out" > "$BRIEF_GATE_DIR/out"
       cp "$err" "$BRIEF_GATE_DIR/err"
       printf '%s' "$rc" > "$BRIEF_GATE_DIR/rc"
