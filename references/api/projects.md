@@ -3,8 +3,8 @@
 # TeamYou API Reference: Projects
 
 Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /openapi.json` carries
-`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 60/min, search 30/min
-(all 1000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 120/min, search 30/min
+(all 2000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
 `X-RateLimit-Reset`. The full machine-readable contract is `GET /openapi.json`.
 
 ## Contents
@@ -46,6 +46,7 @@ GET /projects
 - `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED / AI_SHARE_DISABLED (an account-wide block in Settings > Agent permissions is on; carries requiredPreference, blockedPreferences (every preference in the way; a sharing call can be blocked by two), fix (one line to relay to your person as-is: which switch or switches to turn off, and where) and settingsUrl (the link to those switches) - NOT retryable until the person turns the block off). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Create a project, optionally with its plan and references
 
@@ -86,6 +87,7 @@ Creates a project. Optional `tasks` and `refs` arrays let one call stand up a wh
 - `422` — This Idempotency-Key was already used for a different request (code: idempotency_key_reused). Use a new key for a new write.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Create a project from a template
 
@@ -115,6 +117,7 @@ Creates this account's project from a server-side template: its name, goal, note
 - `409` — Conflict — agent_not_registered: this key has no registered agent, and a template's agent steps are assigned to the agent that creates it. Nothing was created. Carries registerUrl: register (`ty agent register`), then call again.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Get a project (one-call hydrate)
 
@@ -139,6 +142,7 @@ Returns the project with its ordered task plan, hydrated references, a progress 
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Update a project
 
@@ -173,6 +177,7 @@ PUT /projects/{id}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Delete a project
 
@@ -197,6 +202,7 @@ Orphans the project's tasks (nulls their projectId + plan position) and cascades
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### List a project’s history
 
@@ -223,6 +229,7 @@ Who changed the project and its plan’s steps and what, newest first: the same 
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### List comments on a project
 
@@ -247,6 +254,7 @@ GET /projects/{id}/comments
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Comment on a project
 
@@ -281,6 +289,7 @@ Mention an agent with agent://<id-or-slug>: it gets a mentioned item (wakes it).
 - `422` — This Idempotency-Key was already used for a different request (code: idempotency_key_reused). Use a new key for a new write.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Follow a project's comment thread
 
@@ -303,6 +312,7 @@ PUT /projects/{id}/following
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Unfollow a project's comment thread
 
@@ -327,6 +337,7 @@ Stops commented items for this thread until you follow again.
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Add a reference to a project
 
@@ -359,6 +370,7 @@ Links a project to a topic/task/project/doc/url. Re-adding an existing target re
 - `409` — Conflict — e.g. duplicate edge (same direction + label) or the scheduled-action slot limit reached (code: conflict).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Write a document and link it to a project
 
@@ -392,6 +404,7 @@ Writes a markdown document to Agent Drive and links it to the project as a `doc`
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Reorder a project reference
 
@@ -422,6 +435,7 @@ PATCH /projects/{id}/refs/{refId}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Remove a project reference
 
@@ -445,3 +459,4 @@ DELETE /projects/{id}/refs/{refId}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.

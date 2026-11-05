@@ -3,8 +3,8 @@
 # TeamYou API Reference: Tasks
 
 Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /openapi.json` carries
-`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 60/min, search 30/min
-(all 1000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 120/min, search 30/min
+(all 2000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
 `X-RateLimit-Reset`. The full machine-readable contract is `GET /openapi.json`.
 
 ## Contents
@@ -47,6 +47,7 @@ GET /tasks
 - `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED / AI_SHARE_DISABLED (an account-wide block in Settings > Agent permissions is on; carries requiredPreference, blockedPreferences (every preference in the way; a sharing call can be blocked by two), fix (one line to relay to your person as-is: which switch or switches to turn off, and where) and settingsUrl (the link to those switches) - NOT retryable until the person turns the block off). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Create a task
 
@@ -85,6 +86,7 @@ POST /tasks
 - `422` — This Idempotency-Key was already used for a different request (code: idempotency_key_reused). Use a new key for a new write.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Get a task
 
@@ -107,6 +109,7 @@ GET /tasks/{id}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Update a task
 
@@ -148,6 +151,7 @@ Change one or more fields of a task; send at least one. Gated by aiUpdateEnabled
 - `409` — Conflict — edit_conflict: the task changed after the baseUpdatedAt you sent, so nothing was written. Carries currentUpdatedAt (the base to send next), editedBy ({type: person} or {type: agent, name}; null when unknown) and editedAt, never the other change’s text. Read the task again and merge your change into what it now says; resending your old text with the new base overwrites theirs.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Delete a task
 
@@ -170,6 +174,7 @@ DELETE /tasks/{id}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Mark a task done
 
@@ -193,6 +198,7 @@ Set the task to done. Gated by aiUpdateEnabled (403 AI_UPDATE_DISABLED when the 
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### List a task’s history
 
@@ -219,6 +225,7 @@ Who changed the task and what, newest first: the same history the TeamYou app sh
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### List comments on a task
 
@@ -243,6 +250,7 @@ GET /tasks/{id}/comments
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Comment on a task
 
@@ -277,6 +285,7 @@ Mention an agent with agent://<id-or-slug>: it gets a mentioned item (wakes it).
 - `422` — This Idempotency-Key was already used for a different request (code: idempotency_key_reused). Use a new key for a new write.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Follow a task's comment thread
 
@@ -299,6 +308,7 @@ PUT /tasks/{id}/following
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Unfollow a task's comment thread
 
@@ -323,3 +333,4 @@ Stops commented items for this thread until you follow again.
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.

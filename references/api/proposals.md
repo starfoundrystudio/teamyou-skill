@@ -5,8 +5,8 @@
 Your first-pass proposal for your person to review in TeamYou (the guided-review onboarding preview only). Only your person approves it, on the TeamYou review page; no API call can.
 
 Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /openapi.json` carries
-`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 60/min, search 30/min
-(all 1000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 120/min, search 30/min
+(all 2000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
 `X-RateLimit-Reset`. The full machine-readable contract is `GET /openapi.json`.
 
 ### Submit a proposal for your person to review
@@ -36,6 +36,7 @@ Submits your first-pass proposal for your person to review in TeamYou. Nothing i
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Get a proposal
 
@@ -59,6 +60,7 @@ Returns the proposal, its duplicate flags and your person's choices; once they h
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Revise a proposal in review
 
@@ -91,3 +93,4 @@ Replaces the proposal's `playback`, `items`, or both while it is in review; new 
 - `409` — Conflict — e.g. duplicate edge (same direction + label) or the scheduled-action slot limit reached (code: conflict).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.

@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked. Also use it at the start of a session to recall what the team knows, and before finishing a task to save what lasts.
 metadata:
-  version: '3.23.0'
+  version: '3.23.1'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -269,8 +269,10 @@ macOS/Linux and Windows, and the key page.
 
 ## Rate limits and the raw API
 
-Reads 100/min, writes 60/min, search 30/min, all 1000/hour; the helper exits on a 429, so
-back off and retry after `X-RateLimit-Reset` seconds rather than hammering.
+Reads 100/min, writes 120/min, search 30/min, all 2000/hour; the helper exits on a 429, so
+back off and retry after `X-RateLimit-Reset` seconds rather than hammering. A 503
+`rate_limit_unavailable` means the limit check failed, not that you went over: nothing ran,
+so retry after `Retry-After` seconds.
 The HTTP contract, one file per domain (each self-contained; a Contents block once over
 100 lines):
 [overview](references/api/overview.md) · [topics](references/api/topics.md) · [details](references/api/details.md) · [edges](references/api/edges.md) · [search](references/api/search.md) ·

@@ -62,7 +62,7 @@ https://www.teamyou.com/api/external/v1
 
 ## Rate limits
 
-Reads 100/min, writes 60/min, search 30/min (all 1000/hour). Every response carries
+Reads 100/min, writes 120/min, search 30/min (all 2000/hour). Every response carries
 `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers.
 
 ## Discovery

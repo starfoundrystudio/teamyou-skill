@@ -3,8 +3,8 @@
 # TeamYou API Reference: Edges
 
 Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /openapi.json` carries
-`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 60/min, search 30/min
-(all 1000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+`Authorization: Bearer ty_<key>`. Rate limits: reads 100/min, writes 120/min, search 30/min
+(all 2000/hour); every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
 `X-RateLimit-Reset`. The full machine-readable contract is `GET /openapi.json`.
 
 ## Contents
@@ -35,6 +35,7 @@ GET /edges
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Create an edge
 
@@ -68,6 +69,7 @@ Alias: `edges-link`
 - `409` — Conflict — e.g. duplicate edge (same direction + label) or the scheduled-action slot limit reached (code: conflict).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Update edge labels
 
@@ -98,6 +100,7 @@ PATCH /edges/{id}
 - `409` — Conflict — e.g. duplicate edge (same direction + label) or the scheduled-action slot limit reached (code: conflict).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
 
 ### Delete an edge
 
@@ -120,3 +123,4 @@ DELETE /edges/{id}
 - `404` — Resource not found (code: not_found).
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
