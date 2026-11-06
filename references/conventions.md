@@ -287,7 +287,7 @@ PROJECT_ID=$("$TY_DIR/scripts/teamyou.sh" ty projects create "Cabin permit" \
 
 ```bash
 # Today's high-priority tasks
-"$TY_DIR/scripts/teamyou.sh" ty tasks list --status todo --priority high --order-by dueDate
+"$TY_DIR/scripts/teamyou.sh" ty tasks list --status open --priority high --order-by dueDate
 
 # Create with a due date
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Review PR" \

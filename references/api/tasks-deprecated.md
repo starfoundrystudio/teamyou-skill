@@ -14,6 +14,7 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 - [Get a task (deprecated path)](#get-a-task-deprecated-path)
 - [Update a task (deprecated path)](#update-a-task-deprecated-path)
 - [Delete a task (deprecated path)](#delete-a-task-deprecated-path)
+- [Start a task (deprecated path)](#start-a-task-deprecated-path)
 - [Mark a task done (deprecated path)](#mark-a-task-done-deprecated-path)
 - [List a task’s history (deprecated path)](#list-a-tasks-history-deprecated-path)
 - [List comments on a task (deprecated path)](#list-comments-on-a-task-deprecated-path)
@@ -31,7 +32,7 @@ DEPRECATED PATH — use `GET /tasks` instead. Identical behaviour, identical req
 
 **Parameters:**
 
-- `status` (query) — `todo` | `done`
+- `status` (query) — `todo` | `in_progress` | `done` | `open` — A status, or `open` for everything not done.
 - `priority` (query) — `high` | `medium` | `low` | `none`
 - `archived` (query) — `true` | `false`
 - `orderBy` (query) — `createdAt` | `updatedAt` | `dueDate` | `priority`
@@ -67,7 +68,7 @@ DEPRECATED PATH — use `POST /tasks` instead. Identical behaviour, identical re
 | --- | --- | --- | --- |
 | `title` | string | yes | len 1..500 |
 | `description` | string | no | Markdown: what done looks like, the context and the links. Anything longer belongs in an Agent Drive document linked from here. — len 0..10000 |
-| `status` | `todo` \| `done` | no |  |
+| `status` | `todo` \| `in_progress` \| `done` | no |  |
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string (date-time) | no |  |
 | `topicId` | string | no | len 1..∞ |
@@ -130,7 +131,7 @@ DEPRECATED PATH — use `PUT /tasks/{id}` instead. Identical behaviour, identica
 | `title` | string | no | A new title. On a task assigned to another agent, 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key: rewriting its step is an ask too. — len 1..500 |
 | `description` | string \| null | no | The whole new description (Markdown), replacing the old one; null or empty clears it. Requires baseUpdatedAt. On a task assigned to another agent, 403 assignment_refused (reason escalation), as for title. — len 0..10000 |
 | `baseUpdatedAt` | string (date-time) | no | The task's updatedAt as you last read it. Required with description; refused with projectId or position. If the task changed since, nothing is written: 409 edit_conflict, so re-read and merge rather than resend. On any other write it makes that write conditional too. |
-| `status` | `todo` \| `done` | no |  |
+| `status` | `todo` \| `in_progress` \| `done` | no |  |
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string \| null | no |  |
 | `isArchived` | boolean | no |  |
@@ -170,6 +171,29 @@ DEPRECATED PATH — use `DELETE /tasks/{id}` instead. Identical behaviour, ident
 - `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
 - `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED / AI_SHARE_DISABLED (an account-wide block in Settings > Agent permissions is on; carries requiredPreference, blockedPreferences (every preference in the way; a sharing call can be blocked by two), fix (one line to relay to your person as-is: which switch or switches to turn off, and where) and settingsUrl (the link to those switches) - NOT retryable until the person turns the block off). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
 - `404` — Resource not found (code: not_found).
+- `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
+- `500` — Internal server error (code: internal_error).
+- `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.
+
+### Start a task (deprecated path)
+
+```http
+POST /todos/{id}/start
+```
+
+DEPRECATED PATH — use `POST /tasks/{id}/start` instead. Identical behaviour, identical request and response: this is the same handler, reached through an alias route file rather than a redirect, so a request body survives the call. Responses from this path carry `Deprecation: true` and a `Link: <…>; rel="successor-version"` header naming the live path. No removal date is scheduled; those headers are where that will change first.
+
+**Parameters:**
+
+- `id` (path, required) — string — Task: the task's id or its key (e.g. `TASK-12`).
+
+**Responses:**
+
+- `200` — Started task.
+- `401` — Missing, malformed, expired, or revoked API key (code: unauthorized). A revoked key whose agent has been retired answers 403 agent_retired instead.
+- `403` — Forbidden. One of: api_key_user_not_found (key belongs to a user absent from this environment); client_identification_required (no recognized X-TeamYou-Client; carries skill_install_url, registerUrl, docs_url; only when TEAMYOU_GATE_REQUIRE_IDENTIFIED_CLIENT); agent_not_registered (registerUrl, skill_install_url, docs_url); skill_update_required (required_version, install_url, docs_url; possibly Deprecation/Sunset headers); client_update_nudge (a soft, relent-able staleness nudge for an agentic client below the latest release when TEAMYOU_GATE_NAG_ENABLED is on; carries verified_version, required_version, upgrade_url, ack_url, ack_token, nag_interval, nag_acks_so_far, docs_url — upgrade to end it, or fetch ack_url to relent one call at a rising cost); insufficient_scope (the API key lacks this operation’s x-teamyou-scope; carries required_scope, granted_scopes, docs_url — NOT retryable: scopes are fixed at key creation, so create a new key with the required scope instead of retrying); agent_retired (this key was revoked and its agent has been retired; carries agent {id, slug}, retiredAt, harness and remove {schedule, keyFile} — switch to a new key for this account if you were given one, otherwise stop checking in to this account; NOT retryable with this key); or an AI-preference denial AI_UPDATE_DISABLED / AI_DELETE_DISABLED / AI_SHARE_DISABLED (an account-wide block in Settings > Agent permissions is on; carries requiredPreference, blockedPreferences (every preference in the way; a sharing call can be blocked by two), fix (one line to relay to your person as-is: which switch or switches to turn off, and where) and settingsUrl (the link to those switches) - NOT retryable until the person turns the block off). Scopes and AI preferences compose as AND — passing one does not bypass the other. Gate codes only apply when the corresponding env flag is enabled.
+- `404` — Resource not found (code: not_found).
+- `409` — Conflict, and nothing was written. task_already_started: the task is already started; carries startedAt and startedBy (who started it, or null when that cannot be told). task_not_startable: the task is done or archived; carries reason.
 - `429` — Rate limit exceeded (code: rate_limit_exceeded). Includes Retry-After and X-RateLimit-* headers.
 - `500` — Internal server error (code: internal_error).
 - `503` — The limit check itself failed, so the request was not run (code: rate_limit_unavailable). The caller did not go over a limit. Includes Retry-After.

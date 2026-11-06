@@ -25,7 +25,9 @@ scopes it holds.
 https://www.teamyou.com/mcp/install says which is which and carries the configuration for each.
 
 All endpoints require `Authorization: Bearer ty_<key>` except `GET /openapi.json`. Any 2xx body
-may also carry an optional `agent_ecosystem_notice` when the calling skill client is outdated.
+may also carry an optional `agent_ecosystem_notice` when the calling skill client is outdated, and
+a `never_save_notice`, once per key, after the person's never-save settings change: follow its `line`
+from then on in everything you save.
 
 **Scopes.** Each API key carries a fixed set of scopes chosen when it was created. Every
 operation below publishes what it needs as `x-teamyou-scope` — a string, or an array when an
@@ -111,14 +113,14 @@ One file per domain, each self-contained, beside this one under `references/api/
 | `details.md` | Details | 4 |
 | `edges.md` | Edges | 4 |
 | `search.md` | Search | 4 |
-| `tasks.md` | Tasks | 11 |
+| `tasks.md` | Tasks | 12 |
 | `projects.md` | Projects | 15 |
 | `history.md` | History | 1 |
 | `proposals.md` | Proposals | 3 |
 | `areas.md` | Areas | 8 |
 | `agents.md` | Agents | 5 |
 | `agent-drive.md` | Agent Drive | 9 |
-| `preferences.md` | Preferences | 1 |
+| `preferences.md` | Preferences | 3 |
 | `checkin.md` | Check-in | 8 |
 | `agent-drive-deprecated.md` | Agent Drive (deprecated paths) | 8 |
-| `tasks-deprecated.md` | Tasks (deprecated paths) | 11 |
+| `tasks-deprecated.md` | Tasks (deprecated paths) | 12 |

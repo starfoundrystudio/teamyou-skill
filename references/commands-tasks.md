@@ -3,31 +3,39 @@
 Task management: priorities, due dates, status, archiving, and optional links to a topic
 or a project plan.
 
+A task's `status` is `todo` (not started), `in_progress` (started) or `done`. "Open" means
+anything not done: `list --status open`. Start a task before you work on it (`start`), so
+no other session does the same work.
+
 ## Contents
 
 - [Commands](#commands)
+- [Starting a task](#starting-a-task)
 - [Examples](#examples)
 - [Descriptions](#descriptions)
 
 ## Commands
 
 ```bash
-# List tasks with filters
-teamyou.sh ty tasks list [--status todo|done] [--archived] [--priority high|medium|low|none] [--assignee me|none|AGENT] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
+# List tasks with filters. --status open is everything not done.
+teamyou.sh ty tasks list [--status todo|in_progress|done|open] [--archived] [--priority high|medium|low|none] [--assignee me|none|AGENT] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
 
 # Create a task. --topic-id links it to a topic; --project-id puts it on a project plan
 # (with --after / --before to place it; omit both to append).
-teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
+teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
 
 # Get a task
 teamyou.sh ty tasks get TASK-12
 
 # Update. --no-topic unlinks the topic; --no-project takes it off the plan;
 # --no-assignee hands the task back to your person; --no-description clears it.
-teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--no-description] [--base-updated-at UPDATED_AT] [--status todo|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
+teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--no-description] [--base-updated-at UPDATED_AT] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
 
 # Delete
 teamyou.sh ty tasks delete TASK_ID
+
+# Start: todo → in_progress. Refused if it is already started, done or archived.
+teamyou.sh ty tasks start TASK_ID
 
 # Complete (shortcut for --status done)
 teamyou.sh ty tasks complete TASK_ID
@@ -78,13 +86,36 @@ Notes:
   response lists `notified`, including any notification a guardrail refused. Thread text
   is visible to everyone on the thread, so do not volunteer unrelated work in it.
 - A task on a project plan keeps its plan position when completed; a project's
-  `nextAction` is the first incomplete, non-archived task in plan order.
+  `nextAction` is the first incomplete, non-archived task in plan order, started or not.
+
+## Starting a task
+
+`start` moves a `todo` task to `in_progress` and records when (`startedAt`) and who. It is
+how a second session finds out the work is taken, so run it before you begin, not after.
+
+- **Already started** is a 409 `task_already_started` naming `startedAt` and `startedBy`,
+  and nothing changes; the command exits 1. Leave the task alone: another session (maybe
+  your own earlier one) has it. If it came from a check-in item, ack that item `deferred`.
+- A done or archived task is a 409 `task_not_startable` with `reason`.
+- `start` has no 10-minute replay, unlike other writes: running it twice sends it twice,
+  so the second run is refused rather than handed the first run's success.
+- It needs the same permission as completing: a task assigned to you, or agent updates
+  allowed on the account.
+- A started task with no edit or comment for a day reads as stalled, to your person and in
+  your check-ins. Still working on it? Comment where it stands: a comment counts as activity.
+- To hand a started task back, `update TASK_ID --status todo` and say why in a comment.
+  Reassigning a started task, or retiring the agent that holds it, also puts it back to
+  `todo`.
+- `complete` works from either open state.
 
 ## Examples
 
 ```bash
-# Today's high-priority tasks, soonest first
-"$TY_DIR/scripts/teamyou.sh" ty tasks list --status todo --priority high --order-by dueDate
+# Open high-priority tasks, soonest first
+"$TY_DIR/scripts/teamyou.sh" ty tasks list --status open --priority high --order-by dueDate
+
+# What has been started and not finished
+"$TY_DIR/scripts/teamyou.sh" ty tasks list --status in_progress --assignee me
 
 # Create with a due date and link to a topic
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Review PR" \
@@ -96,7 +127,8 @@ Notes:
 # Add a step to the end of a project plan
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Book the inspector" --project-id PROJ-2
 
-# Complete, then archive
+# Start, do the work, complete, then archive
+"$TY_DIR/scripts/teamyou.sh" ty tasks start TASK-12
 "$TY_DIR/scripts/teamyou.sh" ty tasks complete TASK-12
 "$TY_DIR/scripts/teamyou.sh" ty tasks update TASK_ID --archived
 ```
