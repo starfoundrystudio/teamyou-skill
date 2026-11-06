@@ -28,7 +28,7 @@ selects the provisioned OpenClaw mode.
 - [Status, and the self-healing gate](#status-and-the-self-healing-gate)
 - [ack](#ack)
 - [If your slug was renamed](#if-your-slug-was-renamed)
-- [First session](#first-session)
+- [Onboarding your person](#onboarding-your-person)
 - [Examples](#examples)
 
 ## One durable identity per distinct instance
@@ -149,7 +149,11 @@ The old slug stays reserved for you, so a stale config anywhere keeps getting th
 rather than becoming a new agent. Any other command that meets `agent_renamed` exits
 **78** with the body on stdout (`"renamed": true`) and the steps on stderr.
 
-## First session
+## Onboarding your person
+
+If TeamYou gave your person an onboarding project (a "Get to know you" project), it
+replaces the steps below: lead them through it by its notes, and call its steps by their
+visible titles. The steps below are the fallback for an account that has none.
 
 Your first check-in on an unregistered key returns a `system` item telling you to
 register; that item is the trigger for this section, and this is what to do after the
@@ -172,7 +176,16 @@ onboard the human:
 Shared by a team (several humans talk to you)? Create one project for the team and one
 topic per member instead of step 3. Keep onboarding documents private; never share them.
 
-A registered agent on an account that already has projects or topics skips all of this.
+**An account that already has projects or topics** skips steps 2-4. Offer "Get to know
+you" once instead, in a line: it reads what they have first and proposes only what is
+new. On a yes, run `ty projects from-template get-to-know-you`; a deployment that doesn't
+offer it refuses the key, so drop the offer. If the answer says `"created": false`, it
+exists already: if another agent owns its steps, or it is finished, say so and stop; if
+it is yours and open, carry on at its first open step. Never start a second one.
+
+After onboarding, a quick fact is a capture, saved under the working agreement
+(`references/memory.md`), and a ramble is one proposal: `references/ramble.md`.
+
 After that, check in on your schedule or when your person asks, and start each piece of
 work with the task at hand, not with a sweep of the workspace.
 

@@ -19,11 +19,21 @@ only when a request matches it, so the trigger has to live in your standing inst
 
 ## Installing it
 
-- **Only with your person's OK.** Say in two sentences what changes: you will look in
-  TeamYou before you ask them things, and save what lasts so their other agents know it. Say
-  that it applies to all of your sessions, not just this one. Show them the block, and ask.
-  If they say no, or your tool refuses the write, leave your instructions as they are and
-  tell them they can ask you later.
+- **Only with your person's OK, and call it shared memory.** To them it is "shared memory"
+  ("Turn on shared memory"), never "the working agreement". Explain, ask, and wait for the
+  answer, in one short message: what changes (every session you look in TeamYou first,
+  search before you ask them, save decisions, commitments, people and preferences, and say
+  in one line what you saved); the guarantees (you never save secrets, keys, passwords, ID
+  numbers or payment card numbers, and for anything sensitive, such as health, money or
+  contact details, you follow their never-save settings in TeamYou, asking first until you
+  have seen them); where it lives (the instructions you read every session, so all of your
+  sessions, not just this one) and how to undo it (delete it, or ask you to); then one yes
+  or no. Don't paste the block into the chat unless they ask to see it. If they say no, or
+  your tool refuses the write, leave your instructions as they are and don't offer it again;
+  they can ask you later.
+- **Already there.** If your instructions already hold a `teamyou-memory` block, say so in
+  one line. If it is an older version than this file's, or names a slug that is not yours (a
+  copy from another setup), say that too and offer to update it. Never skip this silently.
 - **Where:** wherever you always read, never somewhere you read only sometimes. Each host's
   place is its row in `references/hosts.md` (section "The working agreement"). Where the
   file already holds other instructions, keep them exactly as they are.

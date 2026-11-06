@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.25.0"
+SKILL_VERSION="3.26.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_vYktPeItM8tO"
+SKILL_VERSION_GUID="vg_wywPCDF7aLDX"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -4287,8 +4287,6 @@ Notes:
   Only your person approves a proposal, on its review page (reviewUrl):
   give them the link, wait for them to say done, then get it. Say what you
   leave out in the chat; leftOut is refused and never stored.
-  Available only on deployments running the guided-review onboarding
-  preview.
 EOF
 }
 # GENERATED-FROM-OPENAPI:proposals:end

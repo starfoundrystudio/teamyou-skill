@@ -6,8 +6,8 @@ own row. Read it only when a section of `SKILL.md` or another reference sends yo
 ## The working agreement
 
 Where the TeamYou memory block from `references/memory.md` goes, so that you read it every
-session. Write it only with your person's OK, show it to them first, and keep it whole
-between its markers. Where you cannot write it yourself, give your person the paste text
+session. To your person it is "shared memory". Write it only with their OK, asked as
+`references/memory.md` says, and keep it whole between its markers. Where you cannot write it yourself, give your person the paste text
 from the same file and say where it goes.
 
 | Host                                       | Where the agreement lives                                                                                    | Who writes it                       |
