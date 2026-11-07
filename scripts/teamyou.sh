@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.26.0"
+SKILL_VERSION="3.27.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_wywPCDF7aLDX"
+SKILL_VERSION_GUID="vg_6spVwR0FrIHA"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -3066,6 +3066,56 @@ never_save_set() {
     "$(jq -cn --arg s "$setting" '{setting: $s}')"
 }
 
+# The never-save review (API 2.57.0): what is already saved in a category
+# set to never. Matches are <type>:<id> arguments, sent by id only.
+never_save_matches_body() {
+  local refs=() ref
+  for ref in "$@"; do
+    if [[ "$ref" != *:* || -z "${ref%%:*}" || -z "${ref#*:}" ]]; then
+      echo "Each match is <type>:<id> (types: topic, detail, task, project, area, comment, document): $ref" >&2
+      exit 1
+    fi
+    refs+=("$ref")
+  done
+  printf '%s\n' "${refs[@]}" | jq -Rnc '{matches: [inputs | select(length > 0)
+    | {type: (split(":")[0]), id: (split(":")[1:] | join(":"))}]}'
+}
+
+never_save_review_list() {
+  local status=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+  local path=/never-save-reviews
+  [[ -n "$status" ]] && path="$path?status=$(url_encode "$status")"
+  api_request GET "$path"
+}
+
+never_save_review_get() {
+  if [[ $# -lt 1 ]]; then
+    echo "Usage: teamyou.sh ty never-save review-get <review_id>" >&2
+    exit 1
+  fi
+  api_request GET "/never-save-reviews/$(url_encode "$1")"
+}
+
+# review-attach | review-remove | review-keep: <review_id> <type>:<id>...
+never_save_review_decide() {
+  local action=$1 endpoint=$2
+  shift 2
+  if [[ $# -lt 2 ]]; then
+    echo "Usage: teamyou.sh ty never-save $action <review_id> <type>:<id>..." >&2
+    exit 1
+  fi
+  local review=$1
+  shift
+  api_request POST "/never-save-reviews/$(url_encode "$review")/$endpoint" \
+    "$(never_save_matches_body "$@")"
+}
+
 dispatch_ty_never_save() {
   # Like `ty history`, a bare call is a request: `ty never-save` lists.
   TY_HELP_CONTEXT="ty never-save"
@@ -3082,6 +3132,11 @@ dispatch_ty_never_save() {
   case "$action" in
     list) never_save_list "$@" ;;
     set) never_save_set "$@" ;;
+    review-list) never_save_review_list "$@" ;;
+    review-get) never_save_review_get "$@" ;;
+    review-attach) never_save_review_decide review-attach matches "$@" ;;
+    review-remove) never_save_review_decide review-remove remove "$@" ;;
+    review-keep) never_save_review_decide review-keep keep "$@" ;;
     *) echo "Unknown ty never-save action: $action" >&2; echo "Run 'teamyou.sh ty never-save -h' for usage" >&2; exit 1 ;;
   esac
 }
@@ -4367,6 +4422,11 @@ Usage: teamyou.sh ty never-save [<action> [arguments]]
 Actions:
   list
   set <category> <never|ask-first>
+  review-list [--status open|closed|all]
+  review-get <review_id>
+  review-attach <review_id> <type>:<id>...
+  review-remove <review_id> <type>:<id>...
+  review-keep <review_id> <type>:<id>...
 
 Notes:
   'ty never-save' alone lists what your person lets agents save, per
@@ -4375,8 +4435,14 @@ Notes:
   something, set its category (ty never-save set health never), say which
   category in one line, and never repeat their words. You can only make a
   category stricter; only your person loosens one, in Settings.
-  Categories: health, money, family, contact_details, sex, religion,
-  politics, legal, confidences.
+
+  Setting a category to never gives you a task to check what is already
+  saved in it. Search, attach what you find by id (review-attach), ask
+  your person, then review-remove (for good) or review-keep. Never copy
+  a match anywhere else. Types: topic, detail, task, project, area,
+  comment, document.
+  Categories: health, money, family, contact_details, identity_documents,
+  sex, religion, politics, legal, confidences.
 EOF
 }
 # GENERATED-FROM-OPENAPI:never-save:end
