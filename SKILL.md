@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked. Also use it at the start of a session to recall what the team knows, and before finishing a task to save what lasts.
 metadata:
-  version: '3.27.1'
+  version: '3.28.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -89,7 +89,7 @@ Slug precedence, `kind`, identity fields, `whoami`, `ack` and renames:
 "$TY_DIR/scripts/teamyou.sh" ty agent whoami
 ```
 
-Onboarding (a "Get to know you" project, led by its notes and called by its step titles) and the fallback: `Onboarding your person` in [references/commands-agent.md](references/commands-agent.md).
+Onboarding (your own onboarding project: "Get to know you" for a person's only agent, else "Bring in what you know", one per agent; start one if you have none, lead it by its notes and call its steps by their titles) and the fallback: `Onboarding your person` in [references/commands-agent.md](references/commands-agent.md).
 After it, a ramble is one proposal: [references/ramble.md](references/ramble.md).
 
 ## Modes

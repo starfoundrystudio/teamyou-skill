@@ -103,7 +103,7 @@ Creates this account's project from a server-side template: its name, goal, note
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `templateKey` | `run-a-ramble` \| `get-to-know-you` | yes | The template to create the project from. Only templates an agent may create are accepted; any other key is a 400. |
+| `templateKey` | `run-a-ramble` \| `get-to-know-you` \| `join-the-team` | yes | The template to create the project from. Only templates an agent may create are accepted; any other key is a 400. `get-to-know-you` is one per account, for the first agent; `join-the-team` is one per agent, for each agent after it. |
 
 **Responses:**
 

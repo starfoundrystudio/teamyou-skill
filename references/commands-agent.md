@@ -151,17 +151,33 @@ rather than becoming a new agent. Any other command that meets `agent_renamed` e
 
 ## Onboarding your person
 
-If TeamYou gave your person an onboarding project (a "Get to know you" project), it
-replaces the steps below: lead them through it by its notes, and call its steps by their
-visible titles. The steps below are the fallback for an account that has none.
+Every agent has its own onboarding project. There are two kinds: "Get to know you"
+(`get-to-know-you`), one per account, for your person's first agent, and "Bring in what
+you know" (`join-the-team`), one per agent, for each agent after that. Your onboarding
+project replaces the fallback steps below: lead your person through it by its notes, and
+call its steps by their visible titles.
 
 Your first check-in on an unregistered key returns a `system` item telling you to
 register; that item is the trigger for this section, and this is what to do after the
 `ty agent register` call succeeds.
 
-If `ty agent whoami` returns `null`, this is your first session: register with a stable
-slug (above). Then, only if the account is empty (no projects and at most one topic),
-onboard the human:
+**If you have no onboarding project of your own, start one,** whatever the account already
+holds. Running a template again is safe: an existing project comes back with
+`"created": false` and nothing is written.
+
+1. Run `ty agent list`. If it lists only you, you are your person's only agent: run
+   `ty projects from-template get-to-know-you`. Otherwise run
+   `ty projects from-template join-the-team`.
+2. If `get-to-know-you` answers `"created": false` and its agent steps are not assigned to
+   you, it belongs to another agent: run `ty projects from-template join-the-team` instead.
+   If its agent steps are yours, it is your project: carry on at its first open step, or,
+   if it is finished, you are onboarded.
+3. `join-the-team` is one per agent, so `"created": false` there means the project is
+   yours. Carry on at its first open step. If it is finished, you are onboarded.
+
+**Fallback, for a deployment that offers no template.** It refuses the template key; then
+drop the template. Only if the account is empty (no projects and at most one topic),
+onboard your person with these steps instead:
 
 1. Confirm registration worked (`ty agent whoami` now returns your agent).
 2. Tell the human, in two sentences: TeamYou is the shared workspace they review on the
@@ -175,13 +191,7 @@ onboard the human:
 
 Shared by a team (several humans talk to you)? Create one project for the team and one
 topic per member instead of step 3. Keep onboarding documents private; never share them.
-
-**An account that already has projects or topics** skips steps 2-4. Offer "Get to know
-you" once instead, in a line: it reads what they have first and proposes only what is
-new. On a yes, run `ty projects from-template get-to-know-you`; a deployment that doesn't
-offer it refuses the key, so drop the offer. If the answer says `"created": false`, it
-exists already: if another agent owns its steps, or it is finished, say so and stop; if
-it is yours and open, carry on at its first open step. Never start a second one.
+An account that already has projects or topics skips these steps.
 
 After onboarding, a quick fact is a capture, saved under the working agreement
 (`references/memory.md`), and a ramble is one proposal: `references/ramble.md`.
