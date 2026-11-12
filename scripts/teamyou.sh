@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="3.29.0"
+SKILL_VERSION="4.0.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_B4cyxksna1cA"
+SKILL_VERSION_GUID="vg_m0aIRouPVv7t"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -1023,12 +1023,20 @@ tasks_list() {
   api_request GET "/tasks$params"
 }
 
+# Topics hold knowledge, not tasks (PROJ-49, API 2.60.0): a task can no longer
+# be linked to a topic. The old flags are refused by name, never ignored, so an
+# agent following older instructions learns what to do instead.
+topic_link_retired() {
+  echo "Error: $1 was removed: topics hold knowledge, not tasks, so a task can no longer be linked to a topic. Put the task in a project (--project-id), and add the topic to that project with 'ty projects refs-add <project_id> --target-type topic --target-id <topic_id>' to keep it beside the work." >&2
+  exit 1
+}
+
 tasks_create() {
   local title=$1
   shift || true
   require_value "title" "$title"
 
-  local description="" status="" priority="" due_date="" topic_id="" project_id="" after="" before="" assignee=""
+  local description="" status="" priority="" due_date="" project_id="" after="" before="" assignee=""
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -1037,14 +1045,7 @@ tasks_create() {
       --status) require_flag_arg "--status" $#; status=$2; shift 2 ;;
       --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
       --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
-      --topic-id)
-        if [[ $# -lt 2 || "$2" == -* ]]; then
-          echo "Error: --topic-id requires a value" >&2
-          exit 1
-        fi
-        topic_id=$2
-        shift 2
-        ;;
+      --topic-id) topic_link_retired "--topic-id" ;;
       --project-id)
         if [[ $# -lt 2 || "$2" == -* ]]; then
           echo "Error: --project-id requires a value" >&2
@@ -1066,7 +1067,6 @@ tasks_create() {
     --arg status "$status" \
     --arg priority "$priority" \
     --arg due "$due_date" \
-    --arg topic "$topic_id" \
     --arg project "$project_id" \
     --arg after "$after" \
     --arg before "$before" \
@@ -1076,7 +1076,6 @@ tasks_create() {
     | if $status != "" then . + {status: $status} else . end
     | if $priority != "" then . + {priority: $priority} else . end
     | if $due != "" then . + {dueDate: $due} else . end
-    | if $topic != "" then . + {topicId: $topic} else . end
     | if $project != "" then . + {projectId: $project} else . end
     | if $assignee != "" then . + {assigneeAgentId: $assignee} else . end
     | if ($after != "" or $before != "") then . + {position: (
@@ -1100,7 +1099,7 @@ tasks_update() {
   require_value "task_id" "$task_id"
 
   local title="" description="" clear_description="" base_updated_at=""
-  local status="" priority="" due_date="" archived="" topic_id="" clear_topic=""
+  local status="" priority="" due_date="" archived=""
   local project_id="" clear_project="" after="" before="" assignee="" clear_assignee=""
 
   while [[ $# -gt 0 ]]; do
@@ -1113,15 +1112,8 @@ tasks_update() {
       --priority) require_flag_arg "--priority" $#; priority=$2; shift 2 ;;
       --due-date) require_flag_arg "--due-date" $#; due_date=$2; shift 2 ;;
       --archived) archived="true"; shift ;;
-      --topic-id)
-        if [[ $# -lt 2 || "$2" == -* ]]; then
-          echo "Error: --topic-id requires a value" >&2
-          exit 1
-        fi
-        topic_id=$2
-        shift 2
-        ;;
-      --no-topic) clear_topic="true"; shift ;;
+      --topic-id) topic_link_retired "--topic-id" ;;
+      --no-topic) topic_link_retired "--no-topic" ;;
       --project-id)
         if [[ $# -lt 2 || "$2" == -* ]]; then
           echo "Error: --project-id requires a value" >&2
@@ -1171,8 +1163,6 @@ tasks_update() {
     --arg priority "$priority" \
     --arg due "$due_date" \
     --arg archived "$archived" \
-    --arg topic "$topic_id" \
-    --arg clearTopic "$clear_topic" \
     --arg project "$project_id" \
     --arg clearProject "$clear_project" \
     --arg after "$after" \
@@ -1189,9 +1179,6 @@ tasks_update() {
     | if $priority != "" then . + {priority: $priority} else . end
     | if $due != "" then . + {dueDate: $due} else . end
     | if $archived == "true" then . + {isArchived: true} else . end
-    | if $topic != "" then . + {topicId: $topic}
-      elif $clearTopic == "true" then . + {topicId: null}
-      else . end
     | if $project != "" then . + {projectId: $project}
       elif $clearProject == "true" then . + {projectId: null}
       else . end
@@ -4238,9 +4225,9 @@ Usage: teamyou.sh ty tasks <action> [arguments]
 
 Actions:
   list [--status todo|in_progress|done|open] [--archived] [--priority high|medium|low|none] [--assignee me|none|<agent>] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
-  create <title> [--description <text>] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]
+  create <title> [--description <text>] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]
   get <task_id>
-  update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
+  update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]
   delete <task_id>
   start <task_id>
   complete <task_id>

@@ -1,7 +1,8 @@
 # Commands: `ty tasks`
 
-Task management: priorities, due dates, status, archiving, and optional links to a topic
-or a project plan.
+Task management: priorities, due dates, status, archiving, and a place on a project plan.
+A task cannot go in a topic: topics hold knowledge, and work is grouped in projects. To keep
+a topic beside the work, add it to the project with `ty projects refs-add`.
 
 A task's `status` is `todo` (not started), `in_progress` (started) or `done`. "Open" means
 anything not done: `list --status open`. Start a task before you work on it (`start`), so
@@ -20,16 +21,16 @@ no other session does the same work.
 # List tasks with filters. --status open is everything not done.
 teamyou.sh ty tasks list [--status todo|in_progress|done|open] [--archived] [--priority high|medium|low|none] [--assignee me|none|AGENT] [--order-by createdAt|updatedAt|dueDate|priority] [--limit N]
 
-# Create a task. --topic-id links it to a topic; --project-id puts it on a project plan
-# (with --after / --before to place it; omit both to append).
-teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--topic-id TOPIC_ID] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
+# Create a task. --project-id puts it on a project plan (with --after / --before to
+# place it; omit both to append). Tasks never go in topics: topics hold knowledge.
+teamyou.sh ty tasks create "TITLE" [--description "DESC"] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date "2026-02-01T00:00:00Z"] [--project-id PROJECT_ID] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT]
 
 # Get a task
 teamyou.sh ty tasks get TASK-12
 
-# Update. --no-topic unlinks the topic; --no-project takes it off the plan;
+# Update. --no-project takes it off the plan;
 # --no-assignee hands the task back to your person; --no-description clears it.
-teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--no-description] [--base-updated-at UPDATED_AT] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--topic-id TOPIC_ID] [--no-topic] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
+teamyou.sh ty tasks update TASK_ID [--title "TITLE"] [--description "DESC"] [--no-description] [--base-updated-at UPDATED_AT] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date "DATE"] [--archived] [--project-id PROJECT_ID] [--no-project] [--after TASK_ID] [--before TASK_ID] [--assignee AGENT] [--no-assignee]
 
 # Delete
 teamyou.sh ty tasks delete TASK_ID
@@ -117,12 +118,11 @@ how a second session finds out the work is taken, so run it before you begin, no
 # What has been started and not finished
 "$TY_DIR/scripts/teamyou.sh" ty tasks list --status in_progress --assignee me
 
-# Create with a due date and link to a topic
+# Create with a due date
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Review PR" \
   --description "Check TeamYou API skill PR" \
   --priority high \
-  --due-date "2026-01-31T17:00:00Z" \
-  --topic-id TOPIC_ID
+  --due-date "2026-01-31T17:00:00Z"
 
 # Add a step to the end of a project plan
 "$TY_DIR/scripts/teamyou.sh" ty tasks create "Book the inspector" --project-id PROJ-2

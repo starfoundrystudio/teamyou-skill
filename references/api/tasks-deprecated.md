@@ -71,7 +71,6 @@ DEPRECATED PATH — use `POST /tasks` instead. Identical behaviour, identical re
 | `status` | `todo` \| `in_progress` \| `done` | no |  |
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string (date-time) | no |  |
-| `topicId` | string | no | len 1..∞ |
 | `projectId` | string | no | File the new task into this project's plan: the project's id or its key (e.g. `PROJ-2`). — len 1..∞ |
 | `position` | PlanPosition | no | Where in the plan to place it (requires projectId); omit to append. |
 | `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. 403 assignment_refused (reason escalation), creating nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
@@ -135,7 +134,6 @@ DEPRECATED PATH — use `PUT /tasks/{id}` instead. Identical behaviour, identica
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string \| null | no |  |
 | `isArchived` | boolean | no |  |
-| `topicId` | string \| null | no | len 1..∞ |
 | `projectId` | string \| null | no | Assign or move into this project (the project's id or its key (e.g. `PROJ-2`)); null removes it from its project. — len 1..∞ |
 | `position` | PlanPosition | no | Reorder within the project plan; with projectId, positions on assign. |
 | `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |

@@ -56,7 +56,7 @@ GET /tasks
 POST /tasks
 ```
 
-**Skill CLI:** `teamyou.sh ty tasks create <title> [--description <text>] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--topic-id <id>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]`
+**Skill CLI:** `teamyou.sh ty tasks create <title> [--description <text>] [--status todo|in_progress|done] [--priority high|medium|low|none] [--due-date <ISO8601>] [--project-id <id>] [--after <task_id>] [--before <task_id>] [--assignee <agent>]`
 
 **Parameters:**
 
@@ -71,7 +71,6 @@ POST /tasks
 | `status` | `todo` \| `in_progress` \| `done` | no |  |
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string (date-time) | no |  |
-| `topicId` | string | no | len 1..∞ |
 | `projectId` | string | no | File the new task into this project's plan: the project's id or its key (e.g. `PROJ-2`). — len 1..∞ |
 | `position` | PlanPosition | no | Where in the plan to place it (requires projectId); omit to append. |
 | `assigneeAgentId` | string | no | An agent id or slug; it gets an assigned item. 403 assignment_refused (reason escalation), creating nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
@@ -120,7 +119,7 @@ PUT /tasks/{id}
 
 Change one or more fields of a task; send at least one. Gated by aiUpdateEnabled (403 AI_UPDATE_DISABLED when the person has blocked agent updates), and isArchived: true is a delete, gated by aiDeleteEnabled (403 AI_DELETE_DISABLED). One exception: if the task is assigned to you (to the agent your key belongs to), you may complete or reopen it with a body that sets status and nothing else, even when the person has blocked agent updates. Status only: any other field in the same body, even one that changes nothing, and reassigning the task to yourself, still need updates allowed. The check is made against the task as it is when the write lands, so a task reassigned away from you mid-request is refused like any other. The gate runs before the lookup, so a 403 never reveals whether the id exists.
 
-**Skill CLI:** `teamyou.sh ty tasks update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--topic-id <id>] [--no-topic] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]`
+**Skill CLI:** `teamyou.sh ty tasks update <task_id> [--title <text>] [--description <text>] [--no-description] [--base-updated-at <ISO8601>] [--status todo|in_progress|done] [--priority PRIORITY] [--due-date <ISO8601>] [--archived] [--project-id <id>] [--no-project] [--after <task_id>] [--before <task_id>] [--assignee <agent>] [--no-assignee]`
 
 **Parameters:**
 
@@ -137,7 +136,6 @@ Change one or more fields of a task; send at least one. Gated by aiUpdateEnabled
 | `priority` | `high` \| `medium` \| `low` \| `none` | no |  |
 | `dueDate` | string \| null | no |  |
 | `isArchived` | boolean | no |  |
-| `topicId` | string \| null | no | len 1..∞ |
 | `projectId` | string \| null | no | Assign or move into this project (the project's id or its key (e.g. `PROJ-2`)); null removes it from its project. — len 1..∞ |
 | `position` | PlanPosition | no | Reorder within the project plan; with projectId, positions on assign. |
 | `assigneeAgentId` | string \| null | no | An agent id or slug (it gets an assigned item), or null to unassign. 403 assignment_refused (reason escalation), writing nothing, when that agent holds scopes your key does not or has no live key. — len 1..64 |
