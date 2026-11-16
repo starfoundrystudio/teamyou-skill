@@ -20,7 +20,7 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 POST /search/topics
 ```
 
-**Skill CLI:** `teamyou.sh ty graph search-topics <query> [precision]`
+**Skill CLI:** `teamyou.sh ty graph search-topics <query> [precision] [--all-matches]`
 
 **Request body:**
 
@@ -28,6 +28,7 @@ POST /search/topics
 | --- | --- | --- | --- |
 | `query` | string | yes | len 1..500 |
 | `precision` | `high` \| `medium` \| `low` | no | default `medium` |
+| `relevanceFilter` | boolean | no | false: return every match. — default `true` |
 
 **Responses:**
 
@@ -45,7 +46,7 @@ POST /search/topics
 POST /search/details
 ```
 
-**Skill CLI:** `teamyou.sh ty graph search-details <query> [precision]`
+**Skill CLI:** `teamyou.sh ty graph search-details <query> [precision] [--all-matches]`
 
 **Request body:**
 
@@ -53,6 +54,7 @@ POST /search/details
 | --- | --- | --- | --- |
 | `query` | string | yes | len 1..500 |
 | `precision` | `high` \| `medium` \| `low` | no | default `medium` |
+| `relevanceFilter` | boolean | no | false: return every match. — default `true` |
 
 **Responses:**
 
@@ -82,9 +84,11 @@ Each result carries its `type`, an absolute `url` and `structure` - where it sit
 
 A query that is a task or project key (`TASK-12`, `PROJ-2`, any case) puts that item first, whichever `orderBy`, followed by whatever else matches the text; a key that names nothing of yours changes nothing.
 
+A decision model scores each result against the query after ranking and results it judges not relevant are left out; `hiddenCount` says how many, and `relevanceFilter: false` returns every match. Areas are never left out.
+
 `types` narrows the search; omit it for every type. `scope` (mine | shared | all) applies to documents only. An empty `query` is allowed only with `orderBy: recency`, and then lists the most recently updated items with `score` null and `methods` empty; an empty query with `relevance` is a 400. With a non-empty query, `orderBy: recency` selects candidates by relevance and returns them newest first. The per-type endpoints (`/search/topics`, `/search/details`, `/search/documents`) remain for type-specific fields and filters such as `pathPrefix` and `where`.
 
-**Skill CLI:** `teamyou.sh ty search search <query> [--types t1,t2] [--scope mine|shared|all] [--precision high|medium|low] [--order-by relevance|recency] [--limit N]`
+**Skill CLI:** `teamyou.sh ty search search <query> [--types t1,t2] [--scope mine|shared|all] [--precision high|medium|low] [--order-by relevance|recency] [--limit N] [--all-matches]`
 
 **Request body:**
 
@@ -96,6 +100,7 @@ A query that is a task or project key (`TASK-12`, `PROJ-2`, any case) puts that 
 | `precision` | `high` \| `medium` \| `low` | no | default `medium` |
 | `orderBy` | `relevance` \| `recency` | no | default `relevance` |
 | `limit` | integer | no | 1..50, default `20` |
+| `relevanceFilter` | boolean | no | false: return every match. — default `true` |
 
 **Responses:**
 

@@ -254,7 +254,7 @@ POST /search/documents
 
 Hybrid search over Agent Drive: semantic (vector) + full-text + trigram, fused by weighted RRF with a recency boost, returning one result per document. Search runs over CHUNKS, so content anywhere in a document is findable — not just its opening — and each result names the chunk that matched via snippet/headingPath/chunkIndex. A chunkIndex of 0 means the title or path matched rather than the body. By default searches only your own documents; scope=shared searches ONLY documents other people have shared with you, and scope=all searches both and fuses them into one ranked list. Newly written documents are indexed in the background, so a document pushed a moment ago may take a few seconds to become searchable. Deleted (archived) documents are never returned. `score` is a fused relevance score, NOT a cosine similarity: compare it within one response and never across two. `where` narrows the candidate set of every arm by the documents’ derived metadata before fusion, so it combines with the query rather than filtering its results afterwards.
 
-**Skill CLI:** `teamyou.sh ty agent-drive search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N]`
+**Skill CLI:** `teamyou.sh ty agent-drive search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N] [--all-matches]`
 
 **Request body:**
 
@@ -266,6 +266,7 @@ Hybrid search over Agent Drive: semantic (vector) + full-text + trigram, fused b
 | `limit` | integer | no | Maximum documents to return. Defaults to the precision level’s own cap (high 15, medium 20, low 25); a larger value also widens how many candidates are retrieved. — 1..50 |
 | `scope` | `mine` \| `shared` \| `all` | no | Which documents to search. mine (default) = only your own, exactly as this endpoint behaved before scope existed. shared = ONLY documents other people have granted to you — use this to answer "what did someone share with me about X" without wading through your own Agent Drive documents. all = both, fused into one ranked list. Shared-in hits come back with source "drive-shared" and a sharedBy object. Access is checked on every request, so a revoked document is gone from the very next search. — default `mine` |
 | `where` | string[] | no | Repeat (query) or list (body) to AND up to 10 clauses. Split on the FIRST colon, so a value may contain colons: key is letters/digits/_/- up to 64 chars, value up to 200. A clause matches a field equal to the value OR an array containing it, so tags:research finds "tags: [research, ops]"; a value that is exactly a number or true/false is also tried typed, so priority:3 finds an unquoted 3. No ranges, no OR, no nested paths. Filtering only NARROWS what the scope returns. Not supported with scope=accessed. |
+| `relevanceFilter` | boolean | no | false: return every match. — default `true` |
 
 **Responses:**
 

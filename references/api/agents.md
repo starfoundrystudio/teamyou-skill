@@ -21,7 +21,7 @@ Base URL `https://www.teamyou.com/api/external/v1`. Every request except `GET /o
 GET /agents
 ```
 
-Your peers: every agent registered on this account, with its kind, status, whether it is the primary, whether it is you, and when it was last seen. Address a handoff with `POST /checkin/send` using an `id` or `slug` from here. Keys and permissions are not included.
+Your peers: every agent registered on this account, with its kind, status, whether it is you, and when it was last seen. Address a handoff with `POST /checkin/send` using an `id` or `slug` from here. Keys and permissions are not included.
 
 **Skill CLI:** `teamyou.sh ty agent list`
 

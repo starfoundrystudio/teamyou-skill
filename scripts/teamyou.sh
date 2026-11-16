@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="4.0.0"
+SKILL_VERSION="4.1.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_m0aIRouPVv7t"
+SKILL_VERSION_GUID="vg_0BGIjM3T31ig"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -947,23 +947,49 @@ edges_link() {
 }
 
 search_topics() {
-  local query=$1
-  local precision=${2:-medium}
+  local query=${1:-}
+  if [[ $# -gt 0 ]]; then shift; fi
+
+  # --all-matches turns the relevance filter off for this search. Sent only
+  # when asked for, so an ordinary search sends the body it always sent.
+  local precision="medium" all_matches=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --all-matches) all_matches=1; shift ;;
+      low|medium|high) precision=$1; shift ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
   require_value "query" "$query"
 
   local data
-  data=$(jq -n --arg query "$query" --arg precision "$precision" '{query: $query, precision: $precision}')
+  data=$(jq -n --arg query "$query" --arg precision "$precision" --arg all "$all_matches" \
+    '{query: $query, precision: $precision}
+    | if $all != "" then . + {relevanceFilter: false} else . end')
 
   api_request POST /search/topics "$data"
 }
 
 search_details() {
-  local query=$1
-  local precision=${2:-medium}
+  local query=${1:-}
+  if [[ $# -gt 0 ]]; then shift; fi
+
+  # --all-matches turns the relevance filter off for this search. Sent only
+  # when asked for, so an ordinary search sends the body it always sent.
+  local precision="medium" all_matches=""
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --all-matches) all_matches=1; shift ;;
+      low|medium|high) precision=$1; shift ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
   require_value "query" "$query"
 
   local data
-  data=$(jq -n --arg query "$query" --arg precision "$precision" '{query: $query, precision: $precision}')
+  data=$(jq -n --arg query "$query" --arg precision "$precision" --arg all "$all_matches" \
+    '{query: $query, precision: $precision}
+    | if $all != "" then . + {relevanceFilter: false} else . end')
 
   api_request POST /search/details "$data"
 }
@@ -2614,7 +2640,7 @@ drive_search() {
   local query=${1:-}
   if [[ $# -gt 0 ]]; then shift; fi
 
-  local precision="medium" path_prefix="" limit="" scope=""
+  local precision="medium" path_prefix="" limit="" scope="" all_matches=""
   # Collected as a JSON array because this endpoint takes a BODY - the same
   # clauses the list command sends as repeated query parameters.
   local where_clauses=()
@@ -2624,6 +2650,7 @@ drive_search() {
       --scope) require_flag_arg "--scope" $#; scope=$2; shift 2 ;;
       --where) require_flag_arg "--where" $#; where_clauses+=("$2"); shift 2 ;;
       --limit) require_flag_arg "--limit" $#; limit=$2; shift 2 ;;
+      --all-matches) all_matches=1; shift ;;
       low|medium|high) precision=$1; shift ;;
       *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -2637,6 +2664,9 @@ drive_search() {
   # with it. It also means an older CLI and this one send byte-identical bodies
   # for the same command.
   #
+  # --all-matches turns the relevance filter off (`relevanceFilter: false`), and
+  # is sent only when passed, for the same reason again.
+  #
   # `where` is omitted entirely when no --where was passed, for the same reason
   # --scope is: an absent field cannot disagree with the server's default, and
   # an empty array would be a filter that matches everything - the same result
@@ -2648,11 +2678,13 @@ drive_search() {
     --arg prefix "$path_prefix" \
     --arg limit "$limit" \
     --arg scope "$scope" \
+    --arg all "$all_matches" \
     --args \
     '{query: $query, precision: $precision}
     | if $prefix != "" then . + {pathPrefix: $prefix} else . end
     | if $scope != "" then . + {scope: $scope} else . end
     | if $limit != "" then . + {limit: ($limit | tonumber)} else . end
+    | if $all != "" then . + {relevanceFilter: false} else . end
     | if ($ARGS.positional | length) > 0 then . + {where: $ARGS.positional} else . end' \
     "${where_clauses[@]+"${where_clauses[@]}"}")
 
@@ -2875,9 +2907,10 @@ search_all() {
     shift
   fi
 
-  local types="" scope="" precision="" order_by="" limit=""
+  local types="" scope="" precision="" order_by="" limit="" all_matches=""
   while [[ $# -gt 0 ]]; do
     case $1 in
+      --all-matches) all_matches=1; shift ;;
       --types) require_value "--types" "${2:-}"; types=$2; shift 2 ;;
       --scope) require_value "--scope" "${2:-}"; scope=$2; shift 2 ;;
       --precision) require_value "--precision" "${2:-}"; precision=$2; shift 2 ;;
@@ -2902,7 +2935,9 @@ search_all() {
     --arg precision "$precision" \
     --arg order_by "$order_by" \
     --arg limit "$limit" \
+    --arg all "$all_matches" \
     '{query: $query}
+    | if $all != "" then . + {relevanceFilter: false} else . end
     | if $types != "" then . + {types: ($types | split(",") | map(gsub("^ +| +$"; "")) | map(select(. != "")))} else . end
     | if $scope != "" then . + {scope: $scope} else . end
     | if $precision != "" then . + {precision: $precision} else . end
@@ -4210,8 +4245,8 @@ Edges:
   edges-delete <edge_id>
 
 Search:
-  search-topics <query> [precision]
-  search-details <query> [precision]
+  search-topics <query> [precision] [--all-matches]
+  search-details <query> [precision] [--all-matches]
 EOF
 }
 # GENERATED-FROM-OPENAPI:graph:end
@@ -4371,7 +4406,7 @@ Actions:
   grant <path-or-id> --email <address>
   ungrant <path-or-id> --email <address>   # removes that person’s access
   restore <id>
-  search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N]
+  search <query> [precision] [--scope mine|shared|all] [--path-prefix <prefix>] [--where key:value]... [--limit N] [--all-matches]
 
 TY Agent Drive - document and file storage for agents (markdown today).
 EOF
@@ -4468,7 +4503,7 @@ TeamYou Search (ty search)
 Usage: teamyou.sh ty search <query> [options]
 
 Actions:
-  search <query> [--types t1,t2] [--scope mine|shared|all] [--precision high|medium|low] [--order-by relevance|recency] [--limit N]
+  search <query> [--types t1,t2] [--scope mine|shared|all] [--precision high|medium|low] [--order-by relevance|recency] [--limit N] [--all-matches]
   related <type> <id> [--limit N]
 
 Notes:
@@ -4480,6 +4515,9 @@ Notes:
   --scope applies to documents only.
   An empty query needs --order-by recency, and lists the most recently
   updated items.
+  --all-matches turns the relevance filter off. Where the filter is on for
+  your account, results judged not relevant to the query are left out and
+  the answer's hiddenCount says how many; pass it to get every match.
   related <type> <id> lists the items one hop from one item (a topic's
   details and linked topics, a project's tasks, documents and areas, ...),
   each with its relation. To search for the word itself, run

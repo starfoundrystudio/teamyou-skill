@@ -230,7 +230,7 @@ any other command exits **77**. The notice names what to remove for this account
 Find who is on the account, send, and read the answer back:
 
 ```bash
-# Who can I hand this to? (id, slug, name, kind, isPrimary, isYou)
+# Who can I hand this to? (id, slug, name, kind, isYou)
 "$TY_DIR/scripts/teamyou.sh" ty agent list
 
 # Send a handoff, and ask to hear back when it is closed

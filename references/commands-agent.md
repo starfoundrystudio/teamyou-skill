@@ -12,9 +12,9 @@ teamyou.sh ty agent ack <token>
 ```
 
 `ty agent list` is the peer roster: every agent on this account, with its `id`, `slug`,
-`name`, `kind`, `status`, `isPrimary`, `isYou` and `lastSeenAt`. Address a handoff
-(`ty checkin send --to`) with an `id` or `slug` from it. Keys and permissions are not
-included.
+`name`, `kind`, `status`, `isYou` and `lastSeenAt` (`isPrimary` is always false and going
+away: TeamYou has no primary agent). Address a handoff (`ty checkin send --to`) with an
+`id` or `slug` from it. Keys and permissions are not included.
 
 Environment: `TEAMYOU_AGENT_SLUG` is the default `--slug`; `TEAMYOU_OPENCLAW_INSTANCE_ID`
 selects the provisioned OpenClaw mode.
