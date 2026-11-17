@@ -81,9 +81,9 @@ RETIRED_IS_RESULT=false
 # send a raw token. SKILL_VERSION_GUID is the un-fakeable per-version anchor
 # (TYDEV-984); it is also omitted when empty (a build that did not mint one).
 SKILL_CLIENT="ty-skill"
-SKILL_VERSION="4.1.0"
+SKILL_VERSION="4.2.0"
 SKILL_VARIANT="public"
-SKILL_VERSION_GUID="vg_0BGIjM3T31ig"
+SKILL_VERSION_GUID="vg_fZllrMavSWTi"
 
 # Where each agent's key file lives: one file per agent, named by its slug, so
 # two agents on one machine never read each other's key. A preview build
@@ -3164,6 +3164,78 @@ dispatch_ty_never_save() {
 }
 
 # ============================================================================
+# ty offers — what TeamYou suggests (API 2.64.0)
+# ============================================================================
+#
+# An offer is TeamYou's suggestion to the person, never the agent's own idea:
+# present it as "TeamYou suggests ...", and accept, snooze or dismiss it only
+# on the person's own answer.
+
+# GET /offers [?all=true]: the person's From TeamYou list; --all adds the
+# guided catalogue.
+offers_list() {
+  local all=false
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --all) all=true; shift ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+  local path=/offers
+  [[ "$all" == true ]] && path="$path?all=true"
+  api_request GET "$path"
+}
+
+offers_get() {
+  local offer_id=${1:-}
+  require_value "offer_id" "$offer_id"
+  api_request GET "/offers/$(url_encode "$offer_id")"
+}
+
+# accept <offer_id> starts the offer's project; accept guided:<id> starts a
+# guided project by key, with or without an offer for it.
+offers_accept() {
+  local target=${1:-}
+  require_value "offer_id|guided:key" "$target"
+  shift
+  if [[ $# -gt 0 ]]; then
+    echo "Unknown option: $1" >&2
+    exit 1
+  fi
+  if [[ "$target" == guided:* ]]; then
+    api_request POST /offers/accept-template \
+      "$(jq -cn --arg k "$target" '{templateKey: $k}')"
+  else
+    api_request POST "/offers/$(url_encode "$target")/accept"
+  fi
+}
+
+# snooze | dismiss <offer_id>: the person's "not now" or "not for me".
+offers_move() {
+  local move=$1
+  shift
+  local offer_id=${1:-}
+  require_value "offer_id" "$offer_id"
+  api_request POST "/offers/$(url_encode "$offer_id")/$move"
+}
+
+dispatch_ty_offers() {
+  ty_dispatch_begin "ty offers" show_ty_offers_help "$@" && return 0
+  local action=$1
+  shift
+
+  case "$action" in
+    list) offers_list "$@" ;;
+    get) offers_get "$@" ;;
+    accept) offers_accept "$@" ;;
+    snooze) offers_move snooze "$@" ;;
+    dismiss) offers_move dismiss "$@" ;;
+    -h|--help) show_ty_offers_help ;;
+    *) echo "Unknown ty offers action: $action" >&2; echo "Run 'teamyou.sh ty offers -h' for usage" >&2; exit 1 ;;
+  esac
+}
+
+# ============================================================================
 # ty brief — what this agent should know at the start of a session
 # ============================================================================
 #
@@ -4123,6 +4195,7 @@ dispatch_ty() {
     search) dispatch_ty_search "$@" ;;
     history) dispatch_ty_history "$@" ;;
     never-save) dispatch_ty_never_save "$@" ;;
+    offers) dispatch_ty_offers "$@" ;;
     brief)
       case "${1:-}" in
         -h|--help) show_ty_brief_help ;;
@@ -4206,6 +4279,7 @@ Services:
   search         One ranked search across every type (ty search <query>)
   history        What changed across the account (ty history --since <latest>)
   never-save     What your person lets agents save (ty never-save)
+  offers         What TeamYou suggests to your person (ty offers list)
   brief          What to know at the start of a session (ty brief [words])
 EOF
 
@@ -4468,6 +4542,38 @@ Notes:
 EOF
 }
 # GENERATED-FROM-OPENAPI:never-save:end
+
+# GENERATED-FROM-OPENAPI:offers:start
+show_ty_offers_help() {
+  cat <<'EOF'
+TeamYou Offers (ty offers)
+
+Usage: teamyou.sh ty offers <action> [arguments]
+
+Actions:
+  list [--all]
+  get <offer_id>
+  accept <offer_id|guided:key>
+  snooze <offer_id>
+  dismiss <offer_id>
+
+Notes:
+  An offer is what TeamYou suggests to your person, never your own idea.
+  Say it as TeamYou's ("TeamYou suggests ...", from agentLine) with its
+  why, and raise one only when it fits what they are doing or asking.
+  accept, snooze and dismiss record your person's answer: run them only
+  on their own yes, not now or no, never on your own judgment. When list
+  says quiet true, your person turned on Quiet: raise none of it unless
+  they ask what TeamYou suggests.
+
+  accept <offer_id> starts the offer's project with its agent steps
+  assigned to you; accept guided:<id> starts a guided project from
+  list --all by key, offer or not. Both are safe to repeat: the second
+  returns the same project with alreadyAccepted true. Then do your steps
+  in order. snooze is not now (14 days; a second one dismisses).
+EOF
+}
+# GENERATED-FROM-OPENAPI:offers:end
 
 # Client-side only (no HTTP operation of its own), so hand-written. ASCII only:
 # this is terminal output.

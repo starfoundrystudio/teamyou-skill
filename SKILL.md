@@ -2,7 +2,7 @@
 name: teamyou
 description: Access the TeamYou API to manage knowledge topics, details, edges, semantic search, tasks, projects, areas, agent check-ins (`ty checkin`), and TY Agent Drive (document and file storage for agents, markdown today; noun `ty agent-drive`). Use when the user wants to store, retrieve, search, organize, or plan work in TeamYou, to write, read, or share a document on the agent drive, or when an agent checks in, on its schedule or when asked. Also use it at the start of a session to recall what the team knows, and before finishing a task to save what lasts.
 metadata:
-  version: '4.1.0'
+  version: '4.2.0'
   min_codex_version: '1.0.0'
   openclaw:
     primaryEnv: TEAMYOU_API_KEY
@@ -154,8 +154,7 @@ in your output.
   do not repeat the title there. A leading `---` YAML block in the content is parsed into
   filterable `metadata`; `list`/`search --where status:draft` finds it again.
 
-Long form, the entity mapping and worked workflows:
-[references/conventions.md](references/conventions.md).
+Long form, the entity mapping and worked workflows: [references/conventions.md](references/conventions.md).
 
 ## Nouns
 
@@ -170,6 +169,7 @@ Long form, the entity mapping and worked workflows:
 | `agent`       | `register`, `whoami`, `ack-rename`                  | [commands-agent.md](references/commands-agent.md)             |
 | `checkin`     | `ty checkin`, `ack ID --outcome …`                  | [commands-checkin.md](references/commands-checkin.md)         |
 | `search`      | `<query>` (every type, one list), `related`         | [commands-search.md](references/commands-search.md)           |
+| `offers`      | `list`: "TeamYou suggests…"; `accept` on their yes  | [commands-offers.md](references/commands-offers.md)           |
 
 
 Old pattern: the Agent Drive noun changed from `ty drive` to `ty agent-drive`; the old spelling still runs and says so on stderr, so use `ty agent-drive` everywhere.
@@ -277,6 +277,6 @@ The HTTP contract, one file per domain (each self-contained; a Contents block on
 100 lines):
 [overview](references/api/overview.md) · [topics](references/api/topics.md) · [details](references/api/details.md) · [edges](references/api/edges.md) · [search](references/api/search.md) ·
 [history](references/api/history.md) · [tasks](references/api/tasks.md) · [projects](references/api/projects.md) · [areas](references/api/areas.md) · [agents](references/api/agents.md) ·
-[checkin](references/api/checkin.md) · [agent-drive](references/api/agent-drive.md) · [preferences](references/api/preferences.md) ·
+[checkin](references/api/checkin.md) · [agent-drive](references/api/agent-drive.md) · [preferences](references/api/preferences.md) · [offers](references/api/offers.md) ·
 [agent-drive (deprecated paths)](references/api/agent-drive-deprecated.md) · [tasks (deprecated paths)](references/api/tasks-deprecated.md).
 
